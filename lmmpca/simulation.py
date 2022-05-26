@@ -56,8 +56,9 @@ def simulation(out_file, params):
                 for sig2bs_mean in params['sig2bs_mean_list']:
                     for sig2bs_identical in params['sig2bs_identical_list']:
                         for latend_dimension in params['latent_dimension_list']:
-                            logger.info(f'N: {N}, sig2e: {sig2e:.2f}, sig2bs_mean: {sig2bs_mean}, '
-                                        f'd: {latend_dimension}, sig2bs_identical: {sig2bs_identical}')
+                            logger.info(f'N: {N}, q: {qs[0]}, d: {latend_dimension}, '
+                                        f'sig2e: {sig2e:.2f}, sig2bs_mean: {sig2bs_mean}, '
+                                        f'sig2bs_identical: {sig2bs_identical}')
                             for k in range(params['n_iter']):
                                 pca_data = generate_data(N, qs, latend_dimension,
                                     sig2e, sig2bs_mean, sig2bs_identical, params)
