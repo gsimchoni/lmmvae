@@ -9,24 +9,23 @@ sig2bs_mean_list:
 q_list:
   -
     - 100
-    - 1000
-    - 10000
 latent_dimension_list:
   - 2
   - 5
 N_list:
-  - 100
+  - 10000
 n_iter: 5
 n_per_cat: 3
 fixed_intercept: 1
 n_fixed_features: 10
 X_non_linear: False
 Z_non_linear: False
-max_epochs: 500
+max_it: 500
 verbose: True
 log_params: False
 test_size: 0.2
 thresh: 0.0001
+RE_col: 'z'
 pca_types:
   - 'ignore'
   - 'ohe'

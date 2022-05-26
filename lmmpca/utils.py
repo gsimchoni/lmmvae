@@ -1,18 +1,19 @@
 from collections import namedtuple
 
 import numpy as np
+import pandas as pd
 import scipy.sparse as sparse
+from sklearn.model_selection import train_test_split
 
 PCAResult = namedtuple(
     'PCAResult', ['metric', 'sigmas', 'n_epochs', 'time'])
 
 Data = namedtuple('PCAData', [
-    'X_train', 'X_test', 'y_train', 'y_test', 'Z_train', 'Z_test', 'X_big_train', 'Z_big_train',
-    'X_mean_train', 'X_big_mean_train', 'n_train', 'ns_train', 'U', 'U_train', 'U_test'
+    'X_train', 'X_test', 'y_train', 'y_test', 'W', 'U_train', 'U_test', 'x_cols'
 ])
 
 PCAInput = namedtuple('PCAInput', list(Data._fields) + ['N', 'p', 'q', 'd',
-    'sig2e', 'sig2bs_mean', 'sig2bs_identical', 'k',
+    'sig2e', 'sig2bs_mean', 'sig2bs_identical', 'k', 'max_it', 'RE_col',
     'thresh', 'verbose'])
 
 
@@ -22,11 +23,28 @@ def get_dummies(vec, vec_max):
         vec_size, vec_max), dtype=np.uint8)
     return Z
 
+def process_one_hot_encoding(X_train, X_test, x_cols, RE_col):
+    z_cols = [RE_col]
+    X_train_new = X_train[x_cols]
+    X_test_new = X_test[x_cols]
+    for z_col in z_cols:
+        X_train_ohe = pd.get_dummies(X_train[z_col])
+        X_test_ohe = pd.get_dummies(X_test[z_col])
+        X_test_cols_in_train = set(X_test_ohe.columns).intersection(X_train_ohe.columns)
+        X_train_cols_not_in_test = set(X_train_ohe.columns).difference(X_test_ohe.columns)
+        X_test_comp = pd.DataFrame(np.zeros((X_test.shape[0], len(X_train_cols_not_in_test))),
+            columns=X_train_cols_not_in_test, dtype=np.uint8, index=X_test.index)
+        X_test_ohe_comp = pd.concat([X_test_ohe[X_test_cols_in_train], X_test_comp], axis=1)
+        X_test_ohe_comp = X_test_ohe_comp[X_train_ohe.columns]
+        X_train_ohe.columns = list(map(lambda c: z_col + '_' + str(c), X_train_ohe.columns))
+        X_test_ohe_comp.columns = list(map(lambda c: z_col + '_' + str(c), X_test_ohe_comp.columns))
+        X_train_new = pd.concat([X_train_new, X_train_ohe], axis=1)
+        X_test_new = pd.concat([X_test_new, X_test_ohe_comp], axis=1)
+    return X_train_new, X_test_new
 
 def generate_data(n, qs, d, sig2e, sig2bs_mean, sig2bs_identical, params):
     p = params['n_fixed_features']
     fs_factor = 1
-    tr_p = 1 - params['test_size'] if 'test_size' in params else 0.8
     W = np.random.normal(size=p * d).reshape(p, d)
     U = np.random.normal(size=n * d).reshape(n, d)
     mu = np.random.uniform(-10, 10, size=p)
@@ -51,24 +69,13 @@ def generate_data(n, qs, d, sig2e, sig2bs_mean, sig2bs_identical, params):
         fU = UW
     X = fU + mu + Z @ B + \
         np.random.normal(scale=np.sqrt(sig2e), size=n * p).reshape(n, p)
-    n_train = int(tr_p * n)
-    train_ids = np.sort(np.random.choice(
-        np.arange(n), size=n_train, replace=False))
-    test_ids = np.delete(np.arange(n), train_ids)
-    X_train = X[train_ids, :]
-    X_test = X[test_ids, :]
-    Z_idx_train = Z_idx[train_ids]
-    ns_train = np.array([np.sum(Z_idx_train == j) for j in range(qs[0])])
-    Z_train = Z[train_ids, :]
-    Z_test = Z[test_ids, :]
-    U_train = U[train_ids, :]
-    U_test = U[test_ids, :]
-    Z_big_train = sparse.kron(Z_train, sparse.eye(p))
-    X_big_train = X_train.reshape(-1)
-    X_mean_train = X_train.mean(axis=0)
-    X_big_mean_train = np.tile(X_mean_train, n_train)
+    df = pd.DataFrame(X)
+    x_cols = ['X' + str(i) for i in range(p)]
+    df.columns = x_cols
+    df['z'] = Z_idx
     y = U @ np.ones(d) + np.random.normal(size=n, scale = 1.0)
-    y_train = y[train_ids]
-    y_test = y[test_ids]
-    return Data(X_train, X_test, y_train, y_test, Z_train, Z_test, X_big_train, Z_big_train,
-                X_mean_train, X_big_mean_train, n_train, ns_train, U, U_train, U_test)
+    df['y'] = y
+    test_size = params['test_size'] if 'test_size' in params else 0.2
+    X_train, X_test,  U_train, U_test, y_train, y_test = train_test_split(
+        df.drop('y', axis=1), U, df['y'], test_size=test_size)
+    return Data(X_train, X_test, y_train, y_test, W, U_train, U_test, x_cols)
