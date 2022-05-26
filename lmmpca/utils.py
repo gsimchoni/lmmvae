@@ -9,7 +9,7 @@ PCAResult = namedtuple(
     'PCAResult', ['metric', 'sigmas', 'n_epochs', 'time'])
 
 Data = namedtuple('PCAData', [
-    'X_train', 'X_test', 'y_train', 'y_test', 'W', 'U_train', 'U_test', 'x_cols'
+    'X_train', 'X_test', 'y_train', 'y_test', 'W', 'x_cols'
 ])
 
 PCAInput = namedtuple('PCAInput', list(Data._fields) + ['N', 'p', 'q', 'd',
@@ -76,6 +76,11 @@ def generate_data(n, qs, d, sig2e, sig2bs_mean, sig2bs_identical, params):
     y = U @ np.ones(d) + np.random.normal(size=n, scale = 1.0)
     df['y'] = y
     test_size = params['test_size'] if 'test_size' in params else 0.2
-    X_train, X_test,  U_train, U_test, y_train, y_test = train_test_split(
-        df.drop('y', axis=1), U, df['y'], test_size=test_size)
-    return Data(X_train, X_test, y_train, y_test, W, U_train, U_test, x_cols)
+    X_train, X_test,  y_train, y_test = train_test_split(
+        df.drop('y', axis=1), df['y'], test_size=test_size)
+    # TODO: why is this necessary?
+    X_train.sort_index(inplace=True)
+    X_test.sort_index(inplace=True)
+    y_train = y_train[X_train.index]
+    y_test = y_test[X_test.index]
+    return Data(X_train, X_test, y_train, y_test, W, x_cols)

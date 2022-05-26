@@ -9,6 +9,7 @@ sig2bs_mean_list:
 q_list:
   -
     - 100
+    - 1000
 latent_dimension_list:
   - 2
   - 5
