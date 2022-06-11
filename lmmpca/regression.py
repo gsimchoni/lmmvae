@@ -7,6 +7,7 @@ from sklearn.metrics import mean_squared_error as mse
 from sklearn.preprocessing import StandardScaler
 
 from lmmpca.pca import LMMPCA
+from lmmpca.vaepca import VAE
 from lmmpca.utils import PCAResult, process_one_hot_encoding
 
 
@@ -42,7 +43,32 @@ def reg_lmmpca(X_train, X_test, y_train, y_test, RE_col, d, verbose, tolerance, 
     return y_pred, [pca.sig2e_est, sig2bs_mean_est], pca.n_iter
 
 
-def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_col, d, pca_type, thresh, max_it, cardinality, verbose):
+def reg_vaepca(X_train, X_test, y_train, y_test, RE_col, d,
+    x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
+    verbose, ignore_RE=False):
+    if ignore_RE:
+        X_train, X_test = X_train[x_cols], X_test[x_cols]
+    else:
+        X_train, X_test = process_one_hot_encoding(X_train, X_test, x_cols, RE_col)
+    vae = VAE(X_train.shape[1], d, batch_size, epochs, patience, n_neurons,
+            dropout, activation, verbose)
+    
+    # scaler = StandardScaler()
+    # X_train = scaler.fit_transform(X_train)
+    # X_test = scaler.transform(X_test)
+
+    X_transformed_tr = vae.fit_transform(X_train)
+    X_transformed_te = vae.transform(X_test)
+
+    lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
+    y_pred = lm_fit.predict(X_transformed_te)
+    n_epochs = len(vae.get_history().history['loss'])
+    return y_pred, [None, None], n_epochs
+
+
+def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_col, d, pca_type,
+    thresh, epochs, cardinality, batch_size, patience, n_neurons, dropout,
+    activation, verbose):
     start = time.time()
     if pca_type == 'ignore':
         y_pred, sigmas, n_epochs = reg_pca_ohe_or_ignore(
@@ -52,7 +78,11 @@ def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_col, d, pca_type, thres
             X_train, X_test, y_train, y_test, x_cols, RE_col, d, verbose)
     elif pca_type == 'lmmpca':
         y_pred, sigmas, n_epochs = reg_lmmpca(
-            X_train, X_test, y_train, y_test, RE_col, d, verbose, thresh, max_it, cardinality)
+            X_train, X_test, y_train, y_test, RE_col, d, verbose, thresh, epochs, cardinality)
+    elif pca_type == 'vae':
+        y_pred, sigmas, n_epochs = reg_vaepca(
+            X_train, X_test, y_train, y_test, RE_col, d, x_cols, batch_size,
+            epochs, patience, n_neurons, dropout, activation, verbose, ignore_RE=False)
     else:
         raise ValueError(f'{pca_type} is an unknown pca_type')
     end = time.time()

@@ -36,7 +36,9 @@ def iterate_pca_types(counter, res_df, out_file, pca_in, pca_types, verbose):
 def run_reg_pca(pca_in, pca_type):
     return reg_pca(pca_in.X_train, pca_in.X_test, pca_in.y_train,
         pca_in.y_test, pca_in.x_cols, pca_in.RE_col, pca_in.d, pca_type,
-        pca_in.thresh, pca_in.max_it, pca_in.q, pca_in.verbose)
+        pca_in.thresh, pca_in.epochs, pca_in.q, pca_in.batch_size,
+        pca_in.patience, pca_in.n_neurons, pca_in.dropout, pca_in.activation,
+        pca_in.verbose)
 
 
 def summarize_sim(pca_in, res, pca_type):
@@ -67,7 +69,10 @@ def simulation(out_file, params):
                                 pca_in = PCAInput(*pca_data, N, params['n_fixed_features'],
                                     qs[0], latend_dimension,
                                     sig2e, sig2bs_mean, sig2bs_identical, k,
-                                    params['max_it'], params['RE_col'],
-                                    params['thresh'], params['verbose'])
+                                    params['epochs'], params['RE_col'],
+                                    params['thresh'], params['batch_size'],
+                                    params['patience'],
+                                    params['n_neurons'], params['dropout'],
+                                    params['activation'], params['verbose'])
                                 iterate_pca_types(counter, res_df, out_file,
                                     pca_in, params['pca_types'], params['verbose'])

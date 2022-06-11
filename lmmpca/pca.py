@@ -23,7 +23,6 @@ class LMMPCA(BaseEstimator, TransformerMixin):
         self.verbose = verbose
 
     def fit(self, X, y=None, RE_col='z'):
-        # ns
         self._fit(X, RE_col)
         return self
 

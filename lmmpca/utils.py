@@ -13,8 +13,9 @@ Data = namedtuple('PCAData', [
 ])
 
 PCAInput = namedtuple('PCAInput', list(Data._fields) + ['N', 'p', 'q', 'd',
-    'sig2e', 'sig2bs_mean', 'sig2bs_identical', 'k', 'max_it', 'RE_col',
-    'thresh', 'verbose'])
+    'sig2e', 'sig2bs_mean', 'sig2bs_identical', 'k', 'epochs', 'RE_col',
+    'thresh', 'batch_size', 'patience', 'n_neurons', 'dropout',
+    'activation', 'verbose'])
 
 
 def get_dummies(vec, vec_max):
