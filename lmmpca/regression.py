@@ -7,7 +7,7 @@ from sklearn.metrics import mean_squared_error as mse
 from sklearn.preprocessing import StandardScaler
 
 from lmmpca.pca import LMMPCA
-from lmmpca.vaepca import VAE
+from lmmpca.vaepca import VAE, LMMVAE
 from lmmpca.utils import PCAResult, process_one_hot_encoding
 
 
@@ -66,6 +66,20 @@ def reg_vaepca(X_train, X_test, y_train, y_test, RE_col, d,
     return y_pred, [None, None], n_epochs
 
 
+def reg_lmmvae(X_train, X_test, y_train, y_test, RE_col, q, d, x_cols, re_prior, batch_size,
+    epochs, patience, n_neurons, dropout, activation, verbose):
+    lmmvae = LMMVAE(X_train[x_cols].shape[1], x_cols, RE_col, q, d, re_prior, batch_size, epochs, patience, n_neurons,
+            dropout, activation, verbose)
+    
+    X_transformed_tr = lmmvae.fit_transform(X_train)
+    X_transformed_te = lmmvae.transform(X_test)
+
+    lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
+    y_pred = lm_fit.predict(X_transformed_te)
+    n_epochs = len(lmmvae.get_history().history['loss'])
+    return y_pred, [None, None], n_epochs
+
+
 def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_col, d, pca_type,
     thresh, epochs, cardinality, batch_size, patience, n_neurons, dropout,
     activation, verbose):
@@ -83,6 +97,10 @@ def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_col, d, pca_type,
         y_pred, sigmas, n_epochs = reg_vaepca(
             X_train, X_test, y_train, y_test, RE_col, d, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, verbose, ignore_RE=False)
+    elif pca_type == 'lmmvae':
+        y_pred, sigmas, n_epochs = reg_lmmvae(
+            X_train, X_test, y_train, y_test, RE_col, cardinality, d, x_cols, 1.0, batch_size,
+            epochs, patience, n_neurons, dropout, activation, verbose)
     else:
         raise ValueError(f'{pca_type} is an unknown pca_type')
     end = time.time()
