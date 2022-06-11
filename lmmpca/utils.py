@@ -65,7 +65,7 @@ def generate_data(n, qs, d, sig2e, sig2bs_mean, sig2bs_identical, params):
     if params['X_non_linear']:
         fU = UW * np.cos(UW)
         if d > 1:
-            fU += 2 * U[:, 0] * U[:, 1]
+            fU += (2 * U[:, 0] * U[:, 1])[:, np.newaxis]
     else:
         fU = UW
     X = fU + mu + Z @ B + \
