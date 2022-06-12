@@ -6,6 +6,8 @@ from tensorflow.keras.layers import Dense, Dropout, Input, Layer, Reshape, Dot
 from tensorflow.keras.layers.experimental.preprocessing import CategoryEncoding
 from tensorflow.keras.models import Model
 
+from lmmpca.utils import get_dummies
+
 
 def get_indices(N, Z_idx, min_Z):
         return tf.stack([tf.range(N, dtype=tf.int64), Z_idx - min_Z], axis=1)
@@ -134,6 +136,8 @@ class LMMVAE:
         self.re_prior = tf.constant(re_prior)
         self.x_cols = x_cols
         self.RE_col = RE_col
+        self.p = p
+        self.q = q
         self.callbacks = [EarlyStopping(monitor='val_loss',
                                         patience=self.epochs if patience is None else patience)]
         X_input = Input(shape=p)
@@ -194,18 +198,22 @@ class LMMVAE:
         self._fit(X)
         return self
 
-    def _transform(self, X):
-        X = X[self.x_cols].copy()
-        _, _, X_transformed, _, _, _ = self.variational_encoder.predict(X)
+    def _transform(self, X, predict_B):
+        X, Z = X[self.x_cols].copy(), X[self.RE_col].copy()
+        Z = get_dummies(Z, self.q)
+        if predict_B:
+            _, _, X_transformed, _, _, B = self.variational_encoder.predict(X)
+            self.B = B.mean(axis=0).reshape((self.q, self.p))
+        _, _, X_transformed, _, _, _ = self.variational_encoder.predict(X - Z @ self.B)
         return X_transformed
 
-    def transform(self, X):
+    def transform(self, X, predict_B=True):
         check_is_fitted(self, 'history')
-        return self._transform(X)
+        return self._transform(X, predict_B)
 
-    def fit_transform(self, X):
+    def fit_transform(self, X, predict_B=True):
         self._fit(X)
-        return self._transform(X)
+        return self._transform(X, predict_B)
 
     def get_history(self):
         check_is_fitted(self, 'history')

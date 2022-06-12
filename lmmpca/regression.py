@@ -72,7 +72,7 @@ def reg_lmmvae(X_train, X_test, y_train, y_test, RE_col, q, d, x_cols, re_prior,
             dropout, activation, verbose)
     
     X_transformed_tr = lmmvae.fit_transform(X_train)
-    X_transformed_te = lmmvae.transform(X_test)
+    X_transformed_te = lmmvae.transform(X_test, predict_B=False)
 
     lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
     y_pred = lm_fit.predict(X_transformed_te)
