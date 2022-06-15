@@ -2,37 +2,29 @@ sig2e_list:
   - 1.0
 sig2bs_identical_list:
   - False
-  - True
 sig2bs_mean_list:
   - 1
   - 10
 q_list:
   -
-    - 100
     - 1000
 latent_dimension_list:
-  - 2
   - 5
 N_list:
   - 10000
-n_iter: 5
+n_iter: 3
 n_per_cat: 3
 fixed_intercept: 1
-n_fixed_features: 10
+n_fixed_features: 100
 n_neurons:
   - 100
   - 50
-  - 25
-  - 12
 dropout:
-  - 0.25
-  - 0.25
-  - 0.25
 activation: 'relu'
-X_non_linear: False
+X_non_linear: True
 Z_non_linear: False
-batch_size: 100
-epochs: 500
+batch_size: 1000
+epochs: 1000
 patience: 10
 verbose: True
 log_params: False
@@ -42,6 +34,5 @@ RE_col: 'z'
 pca_types:
   - 'ignore'
   - 'ohe'
-  - 'lmmpca'
   - 'vae'
   - 'lmmvae'

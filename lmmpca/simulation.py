@@ -1,4 +1,5 @@
 import logging
+import os
 from itertools import product
 
 import pandas as pd
@@ -7,6 +8,7 @@ from lmmpca.regression import reg_pca
 from lmmpca.utils import PCAInput, generate_data
 
 logger = logging.getLogger('LMMPCA.logger')
+os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
 
 
 class Count:
@@ -35,16 +37,16 @@ def iterate_pca_types(counter, res_df, out_file, pca_in, pca_types, verbose):
 
 def run_reg_pca(pca_in, pca_type):
     return reg_pca(pca_in.X_train, pca_in.X_test, pca_in.y_train,
-        pca_in.y_test, pca_in.x_cols, pca_in.RE_col, pca_in.d, pca_type,
-        pca_in.thresh, pca_in.epochs, pca_in.q, pca_in.batch_size,
-        pca_in.patience, pca_in.n_neurons, pca_in.dropout, pca_in.activation,
-        pca_in.verbose)
+                   pca_in.y_test, pca_in.x_cols, pca_in.RE_col, pca_in.d, pca_type,
+                   pca_in.thresh, pca_in.epochs, pca_in.q, pca_in.batch_size,
+                   pca_in.patience, pca_in.n_neurons, pca_in.dropout, pca_in.activation,
+                   pca_in.verbose, pca_in.U, pca_in.B)
 
 
 def summarize_sim(pca_in, res, pca_type):
     res = [pca_in.N, pca_in.p, pca_in.q, pca_in.d, pca_in.sig2e, pca_in.sig2bs_mean,
-        pca_in.sig2bs_identical, pca_in.thresh, pca_in.k, pca_type, res.metric,
-        res.sigmas[0], res.sigmas[1], res.n_epochs, res.time]
+           pca_in.sig2bs_identical, pca_in.thresh, pca_in.k, pca_type, res.metric,
+           res.sigmas[0], res.sigmas[1], res.n_epochs, res.time]
     return res
 
 
@@ -64,15 +66,15 @@ def simulation(out_file, params):
                                         f'sig2bs_identical: {sig2bs_identical}')
                             for k in range(params['n_iter']):
                                 pca_data = generate_data(N, qs, latend_dimension,
-                                    sig2e, sig2bs_mean, sig2bs_identical, params)
+                                                         sig2e, sig2bs_mean, sig2bs_identical, params)
                                 logger.info(' iteration: %d' % k)
                                 pca_in = PCAInput(*pca_data, N, params['n_fixed_features'],
-                                    qs[0], latend_dimension,
-                                    sig2e, sig2bs_mean, sig2bs_identical, k,
-                                    params['epochs'], params['RE_col'],
-                                    params['thresh'], params['batch_size'],
-                                    params['patience'],
-                                    params['n_neurons'], params['dropout'],
-                                    params['activation'], params['verbose'])
+                                                  qs[0], latend_dimension,
+                                                  sig2e, sig2bs_mean, sig2bs_identical, k,
+                                                  params['epochs'], params['RE_col'],
+                                                  params['thresh'], params['batch_size'],
+                                                  params['patience'],
+                                                  params['n_neurons'], params['dropout'],
+                                                  params['activation'], params['verbose'])
                                 iterate_pca_types(counter, res_df, out_file,
-                                    pca_in, params['pca_types'], params['verbose'])
+                                                  pca_in, params['pca_types'], params['verbose'])
