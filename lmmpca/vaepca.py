@@ -147,8 +147,9 @@ class LMMVAE:
         Z_input = Input(shape=(1,), dtype=tf.int64)
         Z = CategoryEncoding(max_tokens=q, output_mode='binary')(Z_input)
         # Z = CategoryEncoding(num_tokens=q, output_mode='one_hot')(Z_input) # TF2.8+
-        z = Concatenate()([X_input, Z])
-        z = add_layers_functional(z, n_neurons, dropout, activation, p)
+        # z = Concatenate()([X_input, Z])
+        # z = add_layers_functional(z, n_neurons, dropout, activation, p)
+        z = add_layers_functional(X_input, n_neurons, dropout, activation, p)
         # codings_mean = Dense(d, kernel_regularizer=Orthogonal(d))(z)
         codings_mean = Dense(d)(z)
         codings_log_var = Dense(d)(z)
@@ -156,8 +157,11 @@ class LMMVAE:
         re_codings_log_var = Dense(p)(z)
         codings = Sampling()([codings_mean, codings_log_var])
         re_codings = Sampling()([re_codings_mean, re_codings_log_var])
+        # self.variational_encoder = Model(
+        #     inputs=[X_input, Z_input], outputs=[codings, re_codings]
+        # )
         self.variational_encoder = Model(
-            inputs=[X_input, Z_input], outputs=[codings, re_codings]
+            inputs=[X_input], outputs=[codings, re_codings]
         )
 
         decoder_inputs = Input(shape=d)
@@ -173,7 +177,8 @@ class LMMVAE:
         self.variational_decoder = Model(
             inputs=[decoder_inputs, decoder_re_inputs, Z_input], outputs=[outputs])
 
-        codings, re_codings = self.variational_encoder([X_input, Z_input])
+        # codings, re_codings = self.variational_encoder([X_input, Z_input])
+        codings, re_codings = self.variational_encoder([X_input])
         reconstructions = self.variational_decoder([codings, re_codings, Z_input])
         self.variational_ae = Model(inputs=[X_input, Z_input], outputs=[reconstructions])
 
@@ -202,7 +207,8 @@ class LMMVAE:
 
     def _transform(self, X, U, B):
         X, Z = X[self.x_cols].copy(), X[self.RE_col].copy()
-        X_transformed, B_hat = self.variational_encoder.predict([X, Z])
+        # X_transformed, B_hat = self.variational_encoder.predict([X, Z])
+        X_transformed, B_hat = self.variational_encoder.predict([X])
         B, B_hat = self.extract_Bs_to_compare(B, Z, B_hat)
         return X_transformed
     
