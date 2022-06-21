@@ -171,7 +171,7 @@ class LMMVAE:
         dropout_rev = None if dropout is None else list(reversed(dropout))
         x = add_layers_functional(decoder_inputs, n_neurons_rev, dropout_rev, activation, d)
         decoder_output = Dense(p)(x)
-        B = K.dot(K.transpose(Z), decoder_re_inputs) / K.sum(Z)
+        B = tf.math.divide_no_nan(K.dot(K.transpose(Z), decoder_re_inputs), K.reshape(K.sum(Z, axis=0), (q, 1)))
         ZB = K.dot(Z, B)
         outputs = decoder_output + ZB
         self.variational_decoder = Model(
