@@ -4,29 +4,34 @@ sig2bs_identical_list:
   - False
 sig2bs_mean_list:
   - 1
-  - 10
+  - 0.1
 q_list:
   -
+    - 100
     - 1000
+    - 10000
 latent_dimension_list:
+  - 2
   - 5
 N_list:
-  - 10000
-n_iter: 3
+  - 100000
+n_iter: 5
 n_per_cat: 3
 fixed_intercept: 1
 n_fixed_features: 100
 n_neurons:
   - 100
   - 50
+  - 20
+  - 10
 dropout:
 activation: 'relu'
 X_non_linear: True
 Z_non_linear: False
-batch_size: 1000
+batch_size: 100
 epochs: 1000
 patience: 10
-verbose: True
+verbose: False
 log_params: False
 test_size: 0.2
 thresh: 0.0001

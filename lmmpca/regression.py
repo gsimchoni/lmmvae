@@ -73,6 +73,12 @@ def reg_lmmvae(X_train, X_test, y_train, y_test, RE_col, q, d, x_cols, re_prior,
     lmmvae = LMMVAE(X_train[x_cols].shape[1], x_cols, RE_col, q, d, re_prior, batch_size, epochs, patience, n_neurons,
                     dropout, activation, verbose)
 
+    # scaler = StandardScaler()
+    # X_train_x_cols = pd.DataFrame(scaler.fit_transform(X_train[x_cols]), index=X_train.index, columns=x_cols)
+    # X_train = pd.concat([X_train_x_cols, X_train[RE_col]], axis=1)
+    # X_test_x_cols = pd.DataFrame(scaler.transform(X_test[x_cols]), index=X_test.index, columns=x_cols)
+    # X_test = pd.concat([X_test_x_cols, X_test[RE_col]], axis=1)
+
     X_transformed_tr = lmmvae.fit_transform(X_train, U, B)
     X_transformed_te = lmmvae.transform(X_test, U, B)
 

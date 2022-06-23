@@ -55,7 +55,7 @@ def generate_data(n, qs, d, sig2e, sig2bs_mean, sig2bs_identical, params):
     fs_factor = 1
     W = np.random.normal(size=p * d).reshape(p, d)
     U = np.random.normal(size=n * d).reshape(n, d)
-    mu = np.zeros(p)#np.random.uniform(-10, 10, size=p)
+    mu = np.random.uniform(-10, 10, size=p)#np.zeros(p)
     if sig2bs_identical:
         sig2bs = np.repeat(sig2bs_mean, p)
     else:
@@ -70,9 +70,7 @@ def generate_data(n, qs, d, sig2e, sig2bs_mean, sig2bs_identical, params):
     Z = get_dummies(Z_idx, qs[0])
     UW = U @ W.T
     if params['X_non_linear']:
-        fU = UW * np.cos(UW)
-        if d > 1:
-            fU += (2 * U[:, 0] * U[:, 1])[:, np.newaxis]
+        fU = (U[:,None,:]*W[None,:,:]*np.cos(U[:,None,:]*W[None,:,:])).sum(axis=2)
     else:
         fU = UW
     X = fU + mu + Z @ B + \
