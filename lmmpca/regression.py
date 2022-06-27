@@ -101,6 +101,10 @@ def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_col, d, pca_type,
     elif pca_type == 'lmmpca':
         y_pred, sigmas, n_epochs = reg_lmmpca(
             X_train, X_test, y_train, y_test, RE_col, d, verbose, thresh, epochs, cardinality)
+    elif pca_type == 'vae-ignore':
+        y_pred, sigmas, n_epochs = reg_vaepca(
+            X_train, X_test, y_train, y_test, RE_col, d, x_cols, batch_size,
+            epochs, patience, n_neurons, dropout, activation, verbose, ignore_RE=True)
     elif pca_type == 'vae':
         y_pred, sigmas, n_epochs = reg_vaepca(
             X_train, X_test, y_train, y_test, RE_col, d, x_cols, batch_size,

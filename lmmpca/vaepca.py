@@ -93,8 +93,9 @@ class VAE:
             1 + codings_log_var -
             K.exp(codings_log_var) - K.square(codings_mean),
             axis=-1)
-        self.variational_ae.add_loss(K.mean(kl_loss) / float(p))
-        self.variational_ae.compile(loss='mse', optimizer='adam')
+        self.variational_ae.add_loss(K.mean(kl_loss))
+        self.variational_ae.add_loss(p * MeanSquaredError()(inputs, reconstructions))
+        self.variational_ae.compile(optimizer='adam')
 
     def _fit(self, X):
         self.history = self.variational_ae.fit(X, X, epochs=self.epochs,
@@ -136,7 +137,7 @@ class LMMVAE:
         self.patience = patience
         self.verbose = verbose
         self.history = None
-        self.re_prior = tf.constant(re_prior)
+        self.re_prior = tf.constant(np.log(re_prior, dtype=np.float32))
         self.x_cols = x_cols
         self.RE_col = RE_col
         self.p = p
@@ -190,9 +191,9 @@ class LMMVAE:
             1 + re_codings_log_var - self.re_prior -
             K.exp(re_codings_log_var - self.re_prior) - K.square(re_codings_mean) * K.exp(-self.re_prior),
             axis=-1)
-        self.variational_ae.add_loss(K.mean(kl_loss) / float(p))
-        self.variational_ae.add_loss(K.mean(re_kl_loss) / float(p))
-        self.variational_ae.add_loss(MeanSquaredError()(X_input, reconstructions))
+        self.variational_ae.add_loss(K.mean(kl_loss))
+        self.variational_ae.add_loss(K.mean(re_kl_loss))
+        self.variational_ae.add_loss(p * MeanSquaredError()(X_input, reconstructions))
         self.variational_ae.compile(optimizer='adam')
 
     def _fit(self, X):
