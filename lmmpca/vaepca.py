@@ -223,18 +223,17 @@ class LMMVAE:
         # X_transformed, B_hat = self.variational_encoder.predict([X, Z])
         X_transformed, B_hat = self.variational_encoder.predict([X])
         if extract_B:
-            B_hat = self.extract_Bs_to_compare(Z, B_hat)
-            return X_transformed, B_hat
+            B_hat_df, B_hat = self.extract_Bs_to_compare(Z, B_hat)
+            return X_transformed, B_hat_df
         else:
             return X_transformed, None
     
     def extract_Bs_to_compare(self, Z, B_hat):
         B_df = pd.DataFrame(B_hat)
         B_df['z'] = Z.values
-        B_df2 = B_df.groupby('z')[B_df.columns[:(self.p * self.d)]].mean()
+        B_df2 = B_df.groupby('z')[B_df.columns[:(self.p * self.d)]].mean().reindex(range(self.q), fill_value= 0)
         B_hat = B_df2.values.reshape((B_df2.shape[0], self.p, self.d), order='F')
-        B_df2 = B_df2.reindex(range(self.q), fill_value= 0)
-        return B_df2
+        return B_df2, B_hat
 
     def transform(self, X, U, B, extract_B=False):
         check_is_fitted(self, 'history')
