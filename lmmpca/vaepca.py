@@ -187,8 +187,8 @@ class LMMVAE:
         # outputs = decoder_output# + ZB
         self.variational_decoder = Model(
             inputs=[decoder_inputs, decoder_re_inputs, Z_input], outputs=[decoder_output])
-        self.variational_decoder_no_re = Model(
-            inputs=[decoder_inputs], outputs=[decoder_output])
+        self.variational_decoder_with_re = Model(
+            inputs=[decoder_inputs, decoder_re_inputs, Z_input], outputs=[decoder_output])
 
         # codings, re_codings = self.variational_encoder([X_input, Z_input])
         codings, re_codings = self.variational_encoder([X_input])
@@ -233,7 +233,6 @@ class LMMVAE:
         B_df['z'] = Z.values
         B_df2 = B_df.groupby('z')[B_df.columns[:(self.p * self.d)]].mean()
         B_hat = B_df2.values.reshape((B_df2.shape[0], self.p, self.d), order='F')
-        idx_not_in_B = np.setdiff1d(np.arange(self.q), B_df2.index)
         B_df2 = B_df2.reindex(range(self.q), fill_value= 0)
         return B_df2
 
@@ -246,9 +245,11 @@ class LMMVAE:
         return self._transform(X, U, B, reconstruct_B)
 
     def recostruct(self, X_transformed, Z_idx, B):
-        X_reconstructed = self.variational_decoder_no_re.predict([X_transformed])
-        Z = get_dummies(Z_idx, self.q)
-        return X_reconstructed + Z @ B
+        Z_counts = Z_idx.value_counts().sort_index()
+        Z_counts = Z_counts.reindex(range(self.q), fill_value= 0)
+        B_input = B.reindex(B.index.repeat(Z_counts))
+        X_reconstructed = self.variational_decoder_with_re.predict([X_transformed, B_input, Z_idx])
+        return X_reconstructed
     
     def get_history(self):
         check_is_fitted(self, 'history')
