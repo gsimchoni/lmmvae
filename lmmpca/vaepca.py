@@ -146,6 +146,7 @@ class LMMVAE:
         self.re_prior = tf.constant(np.log(re_prior, dtype=np.float32))
         self.x_cols = x_cols
         self.RE_col = RE_col
+        self.d = d
         self.p = p
         self.q = q
         self.callbacks = [EarlyStopping(monitor='val_loss',
@@ -157,12 +158,13 @@ class LMMVAE:
         # z = Concatenate()([X_input, Z])
         # z = add_layers_functional(z, n_neurons, dropout, activation, p)
         z1 = add_layers_functional(X_input, n_neurons, dropout, activation, p)
-        # codings_mean = Dense(d, kernel_regularizer=Orthogonal(d))(z1)
+        # codings_mean = Dense(d, kernel_regularizer=Orthogonal(d))(z)
         codings_mean = Dense(d)(z1)
         codings_log_var = Dense(d)(z1)
         z2 = add_layers_functional(X_input, n_neurons, dropout, activation, p)
-        re_codings_mean = Dense(p)(z2)
+        re_codings_mean = Dense(p * d)(z2)
         re_codings_log_var = Dense(p)(z2)
+        re_codings_log_var = tf.tile(re_codings_log_var, [1, d])
         codings = Sampling()([codings_mean, codings_log_var])
         re_codings = Sampling()([re_codings_mean, re_codings_log_var])
         # self.variational_encoder = Model(
@@ -173,17 +175,18 @@ class LMMVAE:
         )
 
         decoder_inputs = Input(shape=d)
-        decoder_re_inputs = Input(shape=p)
-        
-        n_neurons_rev = None if n_neurons is None else list(reversed(n_neurons))
-        dropout_rev = None if dropout is None else list(reversed(dropout))
-        x = add_layers_functional(decoder_inputs, n_neurons_rev, dropout_rev, activation, d)
-        decoder_output = Dense(p)(x)
+        decoder_re_inputs = Input(shape=p*d)
         B = tf.math.divide_no_nan(K.dot(K.transpose(Z), decoder_re_inputs), K.reshape(K.sum(Z, axis=0), (q, 1)))
         ZB = K.dot(Z, B)
-        outputs = decoder_output + ZB
+        ub_input = Concatenate()([decoder_inputs, ZB])
+        n_neurons_rev = None if n_neurons is None else list(reversed(n_neurons))
+        dropout_rev = None if dropout is None else list(reversed(dropout))
+        x = add_layers_functional(ub_input, n_neurons_rev, dropout_rev, activation, d)
+        decoder_output = Dense(p)(x)
+        
+        # outputs = decoder_output# + ZB
         self.variational_decoder = Model(
-            inputs=[decoder_inputs, decoder_re_inputs, Z_input], outputs=[outputs])
+            inputs=[decoder_inputs, decoder_re_inputs, Z_input], outputs=[decoder_output])
         self.variational_decoder_no_re = Model(
             inputs=[decoder_inputs], outputs=[decoder_output])
 
@@ -228,7 +231,8 @@ class LMMVAE:
     def extract_Bs_to_compare(self, Z, B_hat):
         B_df = pd.DataFrame(B_hat)
         B_df['z'] = Z.values
-        B_df2 = B_df.groupby('z')[B_df.columns[:self.p]].mean()
+        B_df2 = B_df.groupby('z')[B_df.columns[:(self.p * self.d)]].mean()
+        B_hat = B_df2.values.reshape((B_df2.shape[0], self.p, self.d), order='F')
         idx_not_in_B = np.setdiff1d(np.arange(self.q), B_df2.index)
         B_df2 = B_df2.reindex(range(self.q), fill_value= 0)
         return B_df2

@@ -61,19 +61,28 @@ def generate_data(n, qs, d, sig2e, sig2bs_mean, sig2bs_identical, params):
     else:
         sig2bs = (np.random.poisson(sig2bs_mean, p) + 1) * fs_factor
     D = np.diag(sig2bs)
-    B = np.random.multivariate_normal(np.zeros(p), D, qs[0])
+    B_list = [np.random.multivariate_normal(np.zeros(p), D, qs[0]) for k in range(d)]
+    B = np.stack(B_list, axis=2)
     fs = np.random.poisson(params['n_per_cat'], qs[0]) + 1
     fs_sum = fs.sum()
     ps = fs / fs_sum
     ns = np.random.multinomial(n, ps)
     Z_idx = np.repeat(range(qs[0]), ns)
-    Z = get_dummies(Z_idx, qs[0])
+    # Z = get_dummies(Z_idx, qs[0])
     UW = U @ W.T
     if params['X_non_linear']:
-        fU = (U[:,None,:]*W[None,:,:]*np.cos(U[:,None,:]*W[None,:,:])).sum(axis=2)
+        # fU = (U[:,None,:]*W[None,:,:]*np.cos(U[:,None,:]*W[None,:,:])).sum(axis=2)
+        fU_list = []
+        for j in range(qs[0]):
+            idx = Z_idx == j
+            fU_list.append((U[idx,None,:]*(W[None,:,:] + B[j, None])*np.cos(U[idx,None,:]*W[None,:,:] + B[j, None])).sum(axis=2))
+            # fU_list.append((U[idx,None,:]*(W[None,:,:] + B[j, None])).sum(axis=2))
+        fU = np.concatenate(fU_list, axis=0)
     else:
         fU = UW
-    X = fU + mu + Z @ B + \
+    # X = fU + mu + Z @ B + \
+    #     np.random.normal(scale=np.sqrt(sig2e), size=n * p).reshape(n, p)
+    X = fU + mu + \
         np.random.normal(scale=np.sqrt(sig2e), size=n * p).reshape(n, p)
     df = pd.DataFrame(X)
     x_cols = ['X' + str(i) for i in range(p)]
