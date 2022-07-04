@@ -10,6 +10,8 @@ from tensorflow.keras.losses import MeanSquaredError
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import Regularizer
 
+from lmmpca.utils import get_dummies
+
 
 class Sampling(Layer):
     def call(self, inputs):
@@ -117,6 +119,10 @@ class VAE:
     def fit_transform(self, X):
         self._fit(X)
         return self._transform(X)
+    
+    def reconstruct(self, X_transformed):
+        X_reconstructed = self.variational_decoder.predict([X_transformed])
+        return X_reconstructed
 
     def get_history(self):
         check_is_fitted(self, 'history')
@@ -150,12 +156,13 @@ class LMMVAE:
         # Z = CategoryEncoding(num_tokens=q, output_mode='one_hot')(Z_input) # TF2.8+
         # z = Concatenate()([X_input, Z])
         # z = add_layers_functional(z, n_neurons, dropout, activation, p)
-        z = add_layers_functional(X_input, n_neurons, dropout, activation, p)
-        # codings_mean = Dense(d, kernel_regularizer=Orthogonal(d))(z)
-        codings_mean = Dense(d)(z)
-        codings_log_var = Dense(d)(z)
-        re_codings_mean = Dense(p)(z)
-        re_codings_log_var = Dense(p)(z)
+        z1 = add_layers_functional(X_input, n_neurons, dropout, activation, p)
+        # codings_mean = Dense(d, kernel_regularizer=Orthogonal(d))(z1)
+        codings_mean = Dense(d)(z1)
+        codings_log_var = Dense(d)(z1)
+        z2 = add_layers_functional(X_input, n_neurons, dropout, activation, p)
+        re_codings_mean = Dense(p)(z2)
+        re_codings_log_var = Dense(p)(z2)
         codings = Sampling()([codings_mean, codings_log_var])
         re_codings = Sampling()([re_codings_mean, re_codings_log_var])
         # self.variational_encoder = Model(
@@ -177,6 +184,8 @@ class LMMVAE:
         outputs = decoder_output + ZB
         self.variational_decoder = Model(
             inputs=[decoder_inputs, decoder_re_inputs, Z_input], outputs=[outputs])
+        self.variational_decoder_no_re = Model(
+            inputs=[decoder_inputs], outputs=[decoder_output])
 
         # codings, re_codings = self.variational_encoder([X_input, Z_input])
         codings, re_codings = self.variational_encoder([X_input])
@@ -206,29 +215,37 @@ class LMMVAE:
         self._fit(X)
         return self
 
-    def _transform(self, X, U, B):
+    def _transform(self, X, U, B, extract_B):
         X, Z = X[self.x_cols].copy(), X[self.RE_col].copy()
         # X_transformed, B_hat = self.variational_encoder.predict([X, Z])
         X_transformed, B_hat = self.variational_encoder.predict([X])
-        B, B_hat = self.extract_Bs_to_compare(B, Z, B_hat)
-        return X_transformed
+        if extract_B:
+            B_hat = self.extract_Bs_to_compare(Z, B_hat)
+            return X_transformed, B_hat
+        else:
+            return X_transformed, None
     
-    def extract_Bs_to_compare(self, B, Z, B_hat):
+    def extract_Bs_to_compare(self, Z, B_hat):
         B_df = pd.DataFrame(B_hat)
         B_df['z'] = Z.values
         B_df2 = B_df.groupby('z')[B_df.columns[:self.p]].mean()
         idx_not_in_B = np.setdiff1d(np.arange(self.q), B_df2.index)
-        B2 = np.delete(B, idx_not_in_B, axis=0)
-        return B2, B_df2.values
+        B_df2 = B_df2.reindex(range(self.q), fill_value= 0)
+        return B_df2
 
-    def transform(self, X, U, B):
+    def transform(self, X, U, B, extract_B=False):
         check_is_fitted(self, 'history')
-        return self._transform(X, U, B)
+        return self._transform(X, U, B, extract_B)
 
-    def fit_transform(self, X, U, B):
+    def fit_transform(self, X, U, B, reconstruct_B=True):
         self._fit(X)
-        return self._transform(X, U, B)
+        return self._transform(X, U, B, reconstruct_B)
 
+    def recostruct(self, X_transformed, Z_idx, B):
+        X_reconstructed = self.variational_decoder_no_re.predict([X_transformed])
+        Z = get_dummies(Z_idx, self.q)
+        return X_reconstructed + Z @ B
+    
     def get_history(self):
         check_is_fitted(self, 'history')
         return self.history

@@ -6,7 +6,7 @@ import scipy.sparse as sparse
 from sklearn.model_selection import train_test_split
 
 PCAResult = namedtuple(
-    'PCAResult', ['metric', 'sigmas', 'n_epochs', 'time'])
+    'PCAResult', ['metric_y', 'metric_X', 'sigmas', 'n_epochs', 'time'])
 
 Data = namedtuple('PCAData', [
     'X_train', 'X_test', 'y_train', 'y_test', 'W', 'U', 'B', 'x_cols'

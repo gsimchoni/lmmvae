@@ -45,8 +45,8 @@ def run_reg_pca(pca_in, pca_type):
 
 def summarize_sim(pca_in, res, pca_type):
     res = [pca_in.N, pca_in.p, pca_in.q, pca_in.d, pca_in.sig2e, pca_in.sig2bs_mean,
-           pca_in.sig2bs_identical, pca_in.thresh, pca_in.k, pca_type, res.metric,
-           res.sigmas[0], res.sigmas[1], res.n_epochs, res.time]
+           pca_in.sig2bs_identical, pca_in.thresh, pca_in.k, pca_type, res.metric_y,
+           res.metric_X, res.sigmas[0], res.sigmas[1], res.n_epochs, res.time]
     return res
 
 
@@ -54,7 +54,7 @@ def simulation(out_file, params):
     counter = Count().gen()
     res_df = pd.DataFrame(
         columns=['N', 'p', 'q', 'd', 'sig2e', 'sig2bs_mean', 'sig2bs_identical', 'thresh'] +
-        ['experiment', 'exp_type', 'mse', 'sig2e_est', 'sig2bs_mean_est', 'n_epochs', 'time'])
+        ['experiment', 'exp_type', 'mse_y', 'mse_X', 'sig2e_est', 'sig2bs_mean_est', 'n_epochs', 'time'])
     for N in params['N_list']:
         for sig2e in params['sig2e_list']:
             for qs in product(*params['q_list']):
