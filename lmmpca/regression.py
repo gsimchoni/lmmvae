@@ -26,6 +26,7 @@ def reg_pca_ohe_or_ignore(X_train, X_test, y_train, y_test, x_cols, RE_col, d, v
     X_transformed_tr = pca.fit_transform(X_train)
     X_transformed_te = pca.transform(X_test)
     X_reconstructed_te = pca.inverse_transform(X_transformed_te)
+    X_reconstructed_te = scaler.inverse_transform(X_reconstructed_te)
 
     lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
     y_pred = lm_fit.predict(X_transformed_te)
