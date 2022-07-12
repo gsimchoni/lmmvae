@@ -12,8 +12,8 @@ q_list:
     - 1000
     - 10000
 latent_dimension_list:
+  - 1
   - 2
-  - 5
 N_list:
   - 100000
 n_iter: 3
@@ -22,8 +22,7 @@ fixed_intercept: 1
 n_fixed_features: 100
 n_neurons:
   - 1000
-  - 50
-  - 20
+  - 500
 dropout:
 activation: 'relu'
 X_non_linear: True
