@@ -73,6 +73,8 @@ def generate_data(n, qs, d, sig2e, sig2bs_means, sig2bs_identical, params):
         sig2bs_mean = sig2bs_means[k]
         if sig2bs_mean < 1:
             fs_factor = sig2bs_mean
+        else:
+            fs_factor = 1
         if sig2bs_identical:
             sig2bs = np.repeat(sig2bs_mean, p)
         else:
