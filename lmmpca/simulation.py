@@ -40,7 +40,7 @@ def run_reg_pca(pca_in, pca_type):
                    pca_in.y_test, pca_in.x_cols, pca_in.RE_cols_prefix, pca_in.d, pca_type,
                    pca_in.thresh, pca_in.epochs, pca_in.qs, pca_in.batch_size,
                    pca_in.patience, pca_in.n_neurons, pca_in.dropout, pca_in.activation,
-                   pca_in.verbose, pca_in.U, pca_in.B)
+                   pca_in.verbose, pca_in.U, pca_in.B_list)
 
 
 def summarize_sim(pca_in, res, pca_type):

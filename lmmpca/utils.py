@@ -9,7 +9,7 @@ PCAResult = namedtuple(
     'PCAResult', ['metric_y', 'metric_X', 'sigmas', 'n_epochs', 'time'])
 
 Data = namedtuple('PCAData', [
-    'X_train', 'X_test', 'y_train', 'y_test', 'W', 'U', 'B', 'x_cols'
+    'X_train', 'X_test', 'y_train', 'y_test', 'W', 'U', 'B_list', 'x_cols'
 ])
 
 PCAInput = namedtuple('PCAInput', list(Data._fields) + ['N', 'p', 'qs', 'd',
@@ -26,13 +26,17 @@ def get_dummies(vec, vec_max):
     return Z
 
 
+def get_columns_by_prefix(df, prefix):
+    return df.columns[df.columns.str.startswith(prefix)]
+
+
 def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix):
-    z_cols = X_train.columns[X_train.columns.str.startswith(RE_cols_prefix)]
+    RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix)
     X_train_new = X_train[x_cols]
     X_test_new = X_test[x_cols]
-    for z_col in z_cols:
-        X_train_ohe = pd.get_dummies(X_train[z_col])
-        X_test_ohe = pd.get_dummies(X_test[z_col])
+    for RE_col in RE_cols:
+        X_train_ohe = pd.get_dummies(X_train[RE_col])
+        X_test_ohe = pd.get_dummies(X_test[RE_col])
         X_test_cols_in_train = set(
             X_test_ohe.columns).intersection(X_train_ohe.columns)
         X_train_cols_not_in_test = set(
@@ -43,9 +47,9 @@ def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix):
             [X_test_ohe[X_test_cols_in_train], X_test_comp], axis=1)
         X_test_ohe_comp = X_test_ohe_comp[X_train_ohe.columns]
         X_train_ohe.columns = list(
-            map(lambda c: z_col + '_' + str(c), X_train_ohe.columns))
+            map(lambda c: RE_col + '_' + str(c), X_train_ohe.columns))
         X_test_ohe_comp.columns = list(
-            map(lambda c: z_col + '_' + str(c), X_test_ohe_comp.columns))
+            map(lambda c: RE_col + '_' + str(c), X_test_ohe_comp.columns))
         X_train_new = pd.concat([X_train_new, X_train_ohe], axis=1)
         X_test_new = pd.concat([X_test_new, X_test_ohe_comp], axis=1)
     return X_train_new, X_test_new
@@ -64,6 +68,7 @@ def generate_data(n, qs, d, sig2e, sig2bs_means, sig2bs_identical, params):
         fU = UW
     X = fU + mu + e
     Z_idx_list = []
+    B_list = []
     for k, q in enumerate(qs):
         sig2bs_mean = sig2bs_means[k]
         if sig2bs_mean < 1:
@@ -74,6 +79,7 @@ def generate_data(n, qs, d, sig2e, sig2bs_means, sig2bs_identical, params):
             sig2bs = (np.random.poisson(sig2bs_mean, p) + 1) * fs_factor
         D = np.diag(sig2bs)
         B = np.random.multivariate_normal(np.zeros(p), D, q)
+        B_list.append(B)
         fs = np.random.poisson(params['n_per_cat'], q) + 1
         fs_sum = fs.sum()
         ps = fs / fs_sum
@@ -98,4 +104,4 @@ def generate_data(n, qs, d, sig2e, sig2bs_means, sig2bs_identical, params):
     y_train = y_train[X_train.index]
     y_test = y_test[X_test.index]
     U_train = U[X_train.index]
-    return Data(X_train, X_test, y_train, y_test, W, U_train, B, x_cols)
+    return Data(X_train, X_test, y_train, y_test, W, U_train, B_list, x_cols)

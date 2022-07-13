@@ -137,7 +137,7 @@ class LMMVAE:
 
     """
 
-    def __init__(self, p, x_cols, RE_col, q, d, re_prior, batch_size, epochs, patience, n_neurons,
+    def __init__(self, p, x_cols, RE_cols, qs, d, re_prior, batch_size, epochs, patience, n_neurons,
                  dropout, activation, verbose) -> None:
         super().__init__()
         K.clear_session()
@@ -148,69 +148,95 @@ class LMMVAE:
         self.history = None
         self.re_prior = tf.constant(np.log(re_prior, dtype=np.float32))
         self.x_cols = x_cols
-        self.RE_col = RE_col
+        self.RE_cols = RE_cols
         self.p = p
-        self.q = q
+        self.qs = qs
         self.callbacks = [EarlyStopping(monitor='val_loss',
                                         patience=self.epochs if patience is None else patience)]
         X_input = Input(shape=p)
-        Z_input = Input(shape=(1,), dtype=tf.int64)
-        Z = CategoryEncoding(max_tokens=q, output_mode='binary')(Z_input)
-        # Z = CategoryEncoding(num_tokens=q, output_mode='one_hot')(Z_input) # TF2.8+
-        # z = Concatenate()([X_input, Z])
+        Z_inputs = []
+        Z_mats = []
+        n_RE_inputs = len(qs)
+        for i in range(n_RE_inputs):
+            Z_input = Input(shape=(1,), dtype=tf.int64)
+            Z_inputs.append(Z_input)
+            # Z = CategoryEncoding(num_tokens=q, output_mode='one_hot')(Z_input) # TF2.8+
+            Z = CategoryEncoding(max_tokens=qs[i], output_mode='binary')(Z_input)
+            Z_mats.append(Z)
+        # z = Concatenate()([X_input] + Z_mats)
         # z = add_layers_functional(z, n_neurons, dropout, activation, p)
         z1 = add_layers_functional(X_input, n_neurons, dropout, activation, p)
         # codings_mean = Dense(d, kernel_regularizer=Orthogonal(d))(z1)
         codings_mean = Dense(d)(z1)
         codings_log_var = Dense(d)(z1)
         z2 = add_layers_functional(X_input, n_neurons, dropout, activation, p)
-        re_codings_mean = Dense(p)(z2)
-        re_codings_log_var = Dense(p)(z2)
+        re_codings_mean_list = []
+        re_codings_log_var_list = []
+        re_codings_list = []
+        for _ in range(n_RE_inputs):
+            re_codings_mean = Dense(p)(z2)
+            re_codings_mean_list.append(re_codings_mean)
+            re_codings_log_var = Dense(p)(z2)
+            re_codings_log_var_list.append(re_codings_log_var)
+            re_codings = Sampling()([re_codings_mean, re_codings_log_var])
+            re_codings_list.append(re_codings)
         codings = Sampling()([codings_mean, codings_log_var])
-        re_codings = Sampling()([re_codings_mean, re_codings_log_var])
         # self.variational_encoder = Model(
-        #     inputs=[X_input, Z_input], outputs=[codings, re_codings]
+        #     inputs=[X_input] + Z_inputs, outputs=[codings] +re_codings_list
         # )
         self.variational_encoder = Model(
-            inputs=[X_input], outputs=[codings, re_codings]
+            inputs=[X_input], outputs=[codings] + re_codings_list
         )
 
         decoder_inputs = Input(shape=d)
-        decoder_re_inputs = Input(shape=p)
+        decoder_re_inputs_list = []
+        for _ in range(n_RE_inputs):
+            decoder_re_inputs = Input(shape=p)
+            decoder_re_inputs_list.append(decoder_re_inputs)
         
         n_neurons_rev = None if n_neurons is None else list(reversed(n_neurons))
         dropout_rev = None if dropout is None else list(reversed(dropout))
         x = add_layers_functional(decoder_inputs, n_neurons_rev, dropout_rev, activation, d)
         decoder_output = Dense(p)(x)
-        B = tf.math.divide_no_nan(K.dot(K.transpose(Z), decoder_re_inputs), K.reshape(K.sum(Z, axis=0), (q, 1)))
-        ZB = K.dot(Z, B)
-        outputs = decoder_output + ZB
+        outputs = decoder_output
+        for i in range(n_RE_inputs):
+            Z = Z_mats[i]
+            decoder_re_inputs = decoder_re_inputs_list[i]
+            B = tf.math.divide_no_nan(K.dot(K.transpose(Z), decoder_re_inputs), K.reshape(K.sum(Z, axis=0), (qs[i], 1)))
+            ZB = K.dot(Z, B)
+            outputs += ZB
         self.variational_decoder = Model(
-            inputs=[decoder_inputs, decoder_re_inputs, Z_input], outputs=[outputs])
+            inputs=[decoder_inputs] + decoder_re_inputs_list + Z_inputs, outputs=[outputs])
         self.variational_decoder_no_re = Model(
             inputs=[decoder_inputs], outputs=[decoder_output])
 
-        # codings, re_codings = self.variational_encoder([X_input, Z_input])
-        codings, re_codings = self.variational_encoder([X_input])
-        reconstructions = self.variational_decoder([codings, re_codings, Z_input])
-        self.variational_ae = Model(inputs=[X_input, Z_input], outputs=[reconstructions])
+        # encoder_outputs = self.variational_encoder([X_input] + Z_inputs)
+        encoder_outputs = self.variational_encoder([X_input])
+        codings = encoder_outputs[0]
+        re_codings_list = encoder_outputs[1:]
+        reconstructions = self.variational_decoder([codings] + re_codings_list + Z_inputs)
+        self.variational_ae = Model(inputs=[X_input] + Z_inputs, outputs=[reconstructions])
 
         kl_loss = -0.5 * K.sum(
             1 + codings_log_var -
             K.exp(codings_log_var) - K.square(codings_mean),
             axis=-1)
-        re_kl_loss = -0.5 * K.sum(
-            1 + re_codings_log_var - self.re_prior -
-            K.exp(re_codings_log_var - self.re_prior) - K.square(re_codings_mean) * K.exp(-self.re_prior),
-            axis=-1)
+        for i in range(n_RE_inputs):
+            re_codings_mean = re_codings_mean_list[i]
+            re_codings_log_var = re_codings_log_var_list[i]
+            re_kl_loss = -0.5 * K.sum(
+                1 + re_codings_log_var - self.re_prior -
+                K.exp(re_codings_log_var - self.re_prior) - K.square(re_codings_mean) * K.exp(-self.re_prior),
+                axis=-1)
+            self.variational_ae.add_loss(K.mean(re_kl_loss))
         self.variational_ae.add_loss(K.mean(kl_loss))
-        self.variational_ae.add_loss(K.mean(re_kl_loss))
         self.variational_ae.add_loss(p * MeanSquaredError()(X_input, reconstructions))
         self.variational_ae.compile(optimizer='adam')
 
     def _fit(self, X):
-        X, Z = X[self.x_cols].copy(), X[self.RE_col].copy()
-        self.history = self.variational_ae.fit([X, Z], X, epochs=self.epochs,
+        X_input = X[self.x_cols].copy()
+        Z_inputs = [X[RE_col].copy() for RE_col in self.RE_cols]
+        self.history = self.variational_ae.fit([X_input] + Z_inputs, X, epochs=self.epochs,
             callbacks=self.callbacks, batch_size=self.batch_size, validation_split=0.1,
             verbose=self.verbose)
         gc.collect()
@@ -219,36 +245,43 @@ class LMMVAE:
         self._fit(X)
         return self
 
-    def _transform(self, X, U, B, extract_B):
-        X, Z = X[self.x_cols].copy(), X[self.RE_col].copy()
-        # X_transformed, B_hat = self.variational_encoder.predict([X, Z])
-        X_transformed, B_hat = self.variational_encoder.predict([X])
+    def _transform(self, X, U, B_list, extract_B):
+        X_input = X[self.x_cols].copy()
+        Z_inputs = [X[RE_col].copy() for RE_col in self.RE_cols]
+        # encoder_output = self.variational_encoder.predict([X_input] + Z_inputs)
+        encoder_output = self.variational_encoder.predict([X_input])
+        X_transformed = encoder_output[0]
+        B_hat_list = encoder_output[1:]
         if extract_B:
-            B_hat = self.extract_Bs_to_compare(Z, B_hat)
-            return X_transformed, B_hat
+            B_hat_list = self.extract_Bs_to_compare(Z_inputs, B_hat_list)
+            return X_transformed, B_hat_list
         else:
             return X_transformed, None
     
-    def extract_Bs_to_compare(self, Z, B_hat):
-        B_df = pd.DataFrame(B_hat)
-        B_df['z'] = Z.values
-        B_df2 = B_df.groupby('z')[B_df.columns[:self.p]].mean()
-        idx_not_in_B = np.setdiff1d(np.arange(self.q), B_df2.index)
-        B_df2 = B_df2.reindex(range(self.q), fill_value= 0)
-        return B_df2
+    def extract_Bs_to_compare(self, Z_inputs, B_hat_list):
+        B_df2_list = []
+        for i in range(len(Z_inputs)):
+            B_df = pd.DataFrame(B_hat_list[i])
+            B_df['z'] = Z_inputs[i].values
+            B_df2 = B_df.groupby('z')[B_df.columns[:self.p]].mean()
+            B_df2 = B_df2.reindex(range(self.qs[i]), fill_value= 0)
+            B_df2_list.append(B_df2)
+        return B_df2_list
 
-    def transform(self, X, U, B, extract_B=False):
+    def transform(self, X, U, B_list, extract_B=False):
         check_is_fitted(self, 'history')
-        return self._transform(X, U, B, extract_B)
+        return self._transform(X, U, B_list, extract_B)
 
-    def fit_transform(self, X, U, B, reconstruct_B=True):
+    def fit_transform(self, X, U, B_list, reconstruct_B=True):
         self._fit(X)
-        return self._transform(X, U, B, reconstruct_B)
+        return self._transform(X, U, B_list, reconstruct_B)
 
-    def recostruct(self, X_transformed, Z_idx, B):
+    def recostruct(self, X_transformed, Z_idxs, B_list):
         X_reconstructed = self.variational_decoder_no_re.predict([X_transformed])
-        Z = get_dummies(Z_idx, self.q)
-        return X_reconstructed + Z @ B
+        for i in range(Z_idxs.shape[1]):
+            Z = get_dummies(Z_idxs.iloc[:, i], self.qs[i])
+            X_reconstructed += Z @ B_list[i]
+        return X_reconstructed
     
     def get_history(self):
         check_is_fitted(self, 'history')
