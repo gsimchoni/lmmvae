@@ -84,14 +84,15 @@ def reg_lmmvae(X_train, X_test, y_train, y_test, RE_cols_prefix, q, d, x_cols, r
     # X_test_x_cols = pd.DataFrame(scaler.transform(X_test[x_cols]), index=X_test.index, columns=x_cols)
     # X_test = pd.concat([X_test_x_cols, X_test[RE_cols]], axis=1)
 
-    X_transformed_tr, B_hat_list = lmmvae.fit_transform(X_train, U, B_list)
-    X_transformed_te, _ = lmmvae.transform(X_test, U, B_list)
+    X_transformed_tr, B_hat_list, sig2bs_hat_list = lmmvae.fit_transform(X_train, U, B_list)
+    X_transformed_te, _, _ = lmmvae.transform(X_test, U, B_list)
     X_reconstructed_te = lmmvae.recostruct(X_transformed_te, X_test[RE_cols], B_hat_list)
 
     lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
     y_pred = lm_fit.predict(X_transformed_te)
     n_epochs = len(lmmvae.get_history().history['loss'])
-    return y_pred, X_reconstructed_te, [None, None], n_epochs
+    sig2bs_mean_est = [np.mean(sig2bs) for sig2bs in sig2bs_hat_list]
+    return y_pred, X_reconstructed_te, [None, sig2bs_mean_est], n_epochs
 
 
 def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, pca_type,

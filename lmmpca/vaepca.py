@@ -254,9 +254,10 @@ class LMMVAE:
         B_hat_list = encoder_output[1:]
         if extract_B:
             B_hat_list = self.extract_Bs_to_compare(Z_inputs, B_hat_list)
-            return X_transformed, B_hat_list
+            sig2bs_hat_list = [B_hat_list[i].var(axis=0) for i in range(len(B_hat_list))]
+            return X_transformed, B_hat_list, sig2bs_hat_list
         else:
-            return X_transformed, None
+            return X_transformed, None, None
     
     def extract_Bs_to_compare(self, Z_inputs, B_hat_list):
         B_df2_list = []
