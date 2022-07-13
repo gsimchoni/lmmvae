@@ -12,7 +12,8 @@ from lmmpca.utils import PCAResult, get_columns_by_prefix, process_one_hot_encod
 from lmmpca.vaepca import LMMVAE, VAE
 
 
-def reg_pca_ohe_or_ignore(X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, verbose, ignore_RE=False):
+def reg_pca_ohe_or_ignore(X_train, X_test, y_train, y_test, x_cols,
+    RE_cols_prefix, d, n_sig2bs, verbose, ignore_RE=False):
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
     else:
@@ -31,7 +32,8 @@ def reg_pca_ohe_or_ignore(X_train, X_test, y_train, y_test, x_cols, RE_cols_pref
 
     lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
     y_pred = lm_fit.predict(X_transformed_te)
-    return y_pred, X_reconstructed_te, [None, None], None
+    none_sigmas = [None for _ in range(n_sig2bs)]
+    return y_pred, X_reconstructed_te, [None, none_sigmas], None
 
 
 def reg_lmmpca(X_train, X_test, y_train, y_test, RE_cols_prefix, d, verbose, tolerance, max_it, cardinality):
@@ -44,12 +46,12 @@ def reg_lmmpca(X_train, X_test, y_train, y_test, RE_cols_prefix, d, verbose, tol
     lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
     y_pred = lm_fit.predict(X_transformed_te)
     sig2bs_mean_est = np.mean(pca.sig2bs_est)
-    return y_pred, [pca.sig2e_est, sig2bs_mean_est], pca.n_iter
+    return y_pred, [pca.sig2e_est, [sig2bs_mean_est]], pca.n_iter
 
 
 def reg_vaepca(X_train, X_test, y_train, y_test, RE_cols_prefix, d,
                x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
-               verbose, ignore_RE=False):
+               n_sig2bs, verbose, ignore_RE=False):
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
     else:
@@ -69,7 +71,8 @@ def reg_vaepca(X_train, X_test, y_train, y_test, RE_cols_prefix, d,
     lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
     y_pred = lm_fit.predict(X_transformed_te)
     n_epochs = len(vae.get_history().history['loss'])
-    return y_pred, X_reconstructed_te, [None, None], n_epochs
+    none_sigmas = [None for _ in range(n_sig2bs)]
+    return y_pred, X_reconstructed_te, [None, none_sigmas], n_epochs
 
 
 def reg_lmmvae(X_train, X_test, y_train, y_test, RE_cols_prefix, q, d, x_cols, re_prior, batch_size,
@@ -102,21 +105,21 @@ def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, pca_typ
     start = time.time()
     if pca_type == 'ignore':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
-            X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, verbose, ignore_RE=True)
+            X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, len(qs), verbose, ignore_RE=True)
     elif pca_type == 'ohe':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
-            X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, verbose)
+            X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, len(qs), verbose)
     elif pca_type == 'lmmpca':
         y_pred, sigmas, n_epochs = reg_lmmpca(
             X_train, X_test, y_train, y_test, RE_cols_prefix, d, verbose, thresh, epochs, qs[0])
     elif pca_type == 'vae-ignore':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
             X_train, X_test, y_train, y_test, RE_cols_prefix, d, x_cols, batch_size,
-            epochs, patience, n_neurons, dropout, activation, verbose, ignore_RE=True)
+            epochs, patience, n_neurons, dropout, activation, len(qs), verbose, ignore_RE=True)
     elif pca_type == 'vae':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
             X_train, X_test, y_train, y_test, RE_cols_prefix, d, x_cols, batch_size,
-            epochs, patience, n_neurons, dropout, activation, verbose, ignore_RE=False)
+            epochs, patience, n_neurons, dropout, activation, len(qs), verbose, ignore_RE=False)
     elif pca_type == 'lmmvae':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_lmmvae(
             X_train, X_test, y_train, y_test, RE_cols_prefix, qs, d, x_cols, 1.0, batch_size,
