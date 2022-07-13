@@ -1,3 +1,5 @@
+import gc
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -103,6 +105,7 @@ class VAE:
         self.history = self.variational_ae.fit(X, X, epochs=self.epochs,
                                                callbacks=self.callbacks, batch_size=self.batch_size,
                                                validation_split=0.1, verbose=self.verbose)
+        gc.collect()
 
     def fit(self, X):
         self._fit(X)
@@ -210,6 +213,7 @@ class LMMVAE:
         self.history = self.variational_ae.fit([X, Z], X, epochs=self.epochs,
             callbacks=self.callbacks, batch_size=self.batch_size, validation_split=0.1,
             verbose=self.verbose)
+        gc.collect()
 
     def fit(self, X):
         self._fit(X)

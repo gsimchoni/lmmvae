@@ -1,3 +1,4 @@
+import gc
 import time
 
 import numpy as np
@@ -95,6 +96,7 @@ def reg_lmmvae(X_train, X_test, y_train, y_test, RE_col, q, d, x_cols, re_prior,
 def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_col, d, pca_type,
             thresh, epochs, cardinality, batch_size, patience, n_neurons, dropout,
             activation, verbose, U, B):
+    gc.collect()
     start = time.time()
     if pca_type == 'ignore':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
