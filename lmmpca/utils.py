@@ -12,8 +12,9 @@ Data = namedtuple('PCAData', [
     'X_train', 'X_test', 'y_train', 'y_test', 'W', 'U', 'B', 'x_cols'
 ])
 
-PCAInput = namedtuple('PCAInput', list(Data._fields) + ['N', 'p', 'q', 'd',
-                                                        'sig2e', 'sig2bs_mean', 'sig2bs_identical', 'k', 'epochs', 'RE_col',
+PCAInput = namedtuple('PCAInput', list(Data._fields) + ['N', 'p', 'qs', 'd',
+                                                        'sig2e', 'sig2bs_means', 'sig2bs_identical',
+                                                        'k', 'epochs', 'RE_cols_prefix',
                                                         'thresh', 'batch_size', 'patience', 'n_neurons', 'dropout',
                                                         'activation', 'verbose'])
 
@@ -25,8 +26,8 @@ def get_dummies(vec, vec_max):
     return Z
 
 
-def process_one_hot_encoding(X_train, X_test, x_cols, RE_col):
-    z_cols = [RE_col]
+def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix):
+    z_cols = X_train.columns[X_train.columns.str.startswith(RE_cols_prefix)]
     X_train_new = X_train[x_cols]
     X_test_new = X_test[x_cols]
     for z_col in z_cols:
@@ -50,35 +51,42 @@ def process_one_hot_encoding(X_train, X_test, x_cols, RE_col):
     return X_train_new, X_test_new
 
 
-def generate_data(n, qs, d, sig2e, sig2bs_mean, sig2bs_identical, params):
+def generate_data(n, qs, d, sig2e, sig2bs_means, sig2bs_identical, params):
     p = params['n_fixed_features']
-    fs_factor = 1
     W = np.random.normal(size=p * d).reshape(p, d)
     U = np.random.normal(size=n * d).reshape(n, d)
     mu = np.random.uniform(-10, 10, size=p)#np.zeros(p)
-    if sig2bs_identical:
-        sig2bs = np.repeat(sig2bs_mean, p)
-    else:
-        sig2bs = (np.random.poisson(sig2bs_mean, p) + 1) * fs_factor
-    D = np.diag(sig2bs)
-    B = np.random.multivariate_normal(np.zeros(p), D, qs[0])
-    fs = np.random.poisson(params['n_per_cat'], qs[0]) + 1
-    fs_sum = fs.sum()
-    ps = fs / fs_sum
-    ns = np.random.multinomial(n, ps)
-    Z_idx = np.repeat(range(qs[0]), ns)
-    Z = get_dummies(Z_idx, qs[0])
+    e = np.random.normal(scale=np.sqrt(sig2e), size=n * p).reshape(n, p)
     UW = U @ W.T
     if params['X_non_linear']:
         fU = (U[:,None,:]*W[None,:,:]*np.cos(U[:,None,:]*W[None,:,:])).sum(axis=2)
     else:
         fU = UW
-    X = fU + mu + Z @ B + \
-        np.random.normal(scale=np.sqrt(sig2e), size=n * p).reshape(n, p)
+    X = fU + mu + e
+    Z_idx_list = []
+    for k, q in enumerate(qs):
+        sig2bs_mean = sig2bs_means[k]
+        if sig2bs_mean < 1:
+            fs_factor = sig2bs_mean
+        if sig2bs_identical:
+            sig2bs = np.repeat(sig2bs_mean, p)
+        else:
+            sig2bs = (np.random.poisson(sig2bs_mean, p) + 1) * fs_factor
+        D = np.diag(sig2bs)
+        B = np.random.multivariate_normal(np.zeros(p), D, q)
+        fs = np.random.poisson(params['n_per_cat'], q) + 1
+        fs_sum = fs.sum()
+        ps = fs / fs_sum
+        ns = np.random.multinomial(n, ps)
+        Z_idx = np.repeat(range(q), ns)
+        Z = get_dummies(Z_idx, q)
+        X += Z @ B
+        Z_idx_list.append(Z_idx)
     df = pd.DataFrame(X)
     x_cols = ['X' + str(i) for i in range(p)]
     df.columns = x_cols
-    df['z'] = Z_idx
+    for k, Z_idx in enumerate(Z_idx_list):
+        df['z' + str(k)] = Z_idx
     y = U @ np.ones(d) + np.random.normal(size=n, scale=1.0)
     df['y'] = y
     test_size = params['test_size'] if 'test_size' in params else 0.2

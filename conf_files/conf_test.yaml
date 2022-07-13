@@ -3,10 +3,19 @@ sig2e_list:
 sig2bs_identical_list:
   - False
 sig2bs_mean_list:
-  - 0.1
-  - 1
-  - 10
+  -
+    - 0.1
+    - 1
+    - 10
+  -
+    - 0.1
+    - 1
+    - 10
 q_list:
+  -
+    - 100
+    - 1000
+    - 10000
   -
     - 100
     - 1000
@@ -34,7 +43,7 @@ verbose: False
 log_params: False
 test_size: 0.2
 thresh: 0.0001
-RE_col: 'z'
+RE_cols_prefix: 'z'
 pca_types:
   - 'ignore'
   - 'ohe'

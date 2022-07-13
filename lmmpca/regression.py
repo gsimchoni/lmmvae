@@ -12,12 +12,12 @@ from lmmpca.utils import PCAResult, process_one_hot_encoding
 from lmmpca.vaepca import LMMVAE, VAE
 
 
-def reg_pca_ohe_or_ignore(X_train, X_test, y_train, y_test, x_cols, RE_col, d, verbose, ignore_RE=False):
+def reg_pca_ohe_or_ignore(X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, verbose, ignore_RE=False):
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
     else:
         X_train, X_test = process_one_hot_encoding(
-            X_train, X_test, x_cols, RE_col)
+            X_train, X_test, x_cols, RE_cols_prefix)
     pca = PCA(n_components=d)
 
     scaler = StandardScaler()
@@ -93,31 +93,31 @@ def reg_lmmvae(X_train, X_test, y_train, y_test, RE_col, q, d, x_cols, re_prior,
     return y_pred, X_reconstructed_te, [None, None], n_epochs
 
 
-def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_col, d, pca_type,
+def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, pca_type,
             thresh, epochs, cardinality, batch_size, patience, n_neurons, dropout,
             activation, verbose, U, B):
     gc.collect()
     start = time.time()
     if pca_type == 'ignore':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
-            X_train, X_test, y_train, y_test, x_cols, RE_col, d, verbose, ignore_RE=True)
+            X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, verbose, ignore_RE=True)
     elif pca_type == 'ohe':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
-            X_train, X_test, y_train, y_test, x_cols, RE_col, d, verbose)
+            X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, verbose)
     elif pca_type == 'lmmpca':
         y_pred, sigmas, n_epochs = reg_lmmpca(
-            X_train, X_test, y_train, y_test, RE_col, d, verbose, thresh, epochs, cardinality)
+            X_train, X_test, y_train, y_test, RE_cols_prefix, d, verbose, thresh, epochs, cardinality)
     elif pca_type == 'vae-ignore':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
-            X_train, X_test, y_train, y_test, RE_col, d, x_cols, batch_size,
+            X_train, X_test, y_train, y_test, RE_cols_prefix, d, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, verbose, ignore_RE=True)
     elif pca_type == 'vae':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
-            X_train, X_test, y_train, y_test, RE_col, d, x_cols, batch_size,
+            X_train, X_test, y_train, y_test, RE_cols_prefix, d, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, verbose, ignore_RE=False)
     elif pca_type == 'lmmvae':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_lmmvae(
-            X_train, X_test, y_train, y_test, RE_col, cardinality, d, x_cols, 1.0, batch_size,
+            X_train, X_test, y_train, y_test, RE_cols_prefix, cardinality, d, x_cols, 1.0, batch_size,
             epochs, patience, n_neurons, dropout, activation, verbose, U, B)
     else:
         raise ValueError(f'{pca_type} is an unknown pca_type')
