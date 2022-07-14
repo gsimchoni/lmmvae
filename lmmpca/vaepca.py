@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import tensorflow.keras.backend as K
+from packaging import version
 from sklearn.utils.validation import check_is_fitted
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import Concatenate, Dense, Dropout, Input, Layer
@@ -160,8 +161,10 @@ class LMMVAE:
         for i in range(n_RE_inputs):
             Z_input = Input(shape=(1,), dtype=tf.int64)
             Z_inputs.append(Z_input)
-            # Z = CategoryEncoding(num_tokens=q, output_mode='one_hot')(Z_input) # TF2.8+
-            Z = CategoryEncoding(max_tokens=qs[i], output_mode='binary')(Z_input)
+            if version.parse(tf.__version__) >= version.parse('2.8'):
+                Z = CategoryEncoding(num_tokens=qs[i], output_mode='one_hot')(Z_input)
+            else:
+                Z = CategoryEncoding(max_tokens=qs[i], output_mode='binary')(Z_input)
             Z_mats.append(Z)
         # z = Concatenate()([X_input] + Z_mats)
         # z = add_layers_functional(z, n_neurons, dropout, activation, p)
