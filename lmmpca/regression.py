@@ -8,16 +8,17 @@ from sklearn.metrics import mean_squared_error as mse
 from sklearn.preprocessing import StandardScaler
 
 from lmmpca.pca import LMMPCA
-from lmmpca.utils import PCAResult, process_one_hot_encoding
+from lmmpca.utils import PCAResult, get_columns_by_prefix, process_one_hot_encoding
 from lmmpca.vaepca import LMMVAE, VAE
 
 
-def reg_pca_ohe_or_ignore(X_train, X_test, y_train, y_test, x_cols, RE_col, d, verbose, ignore_RE=False):
+def reg_pca_ohe_or_ignore(X_train, X_test, y_train, y_test, x_cols,
+    RE_cols_prefix, d, n_sig2bs, verbose, ignore_RE=False):
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
     else:
         X_train, X_test = process_one_hot_encoding(
-            X_train, X_test, x_cols, RE_col)
+            X_train, X_test, x_cols, RE_cols_prefix)
     pca = PCA(n_components=d)
 
     scaler = StandardScaler()
@@ -31,30 +32,31 @@ def reg_pca_ohe_or_ignore(X_train, X_test, y_train, y_test, x_cols, RE_col, d, v
 
     lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
     y_pred = lm_fit.predict(X_transformed_te)
-    return y_pred, X_reconstructed_te, [None, None], None
+    none_sigmas = [None for _ in range(n_sig2bs)]
+    return y_pred, X_reconstructed_te, [None, none_sigmas], None
 
 
-def reg_lmmpca(X_train, X_test, y_train, y_test, RE_col, d, verbose, tolerance, max_it, cardinality):
+def reg_lmmpca(X_train, X_test, y_train, y_test, RE_cols_prefix, d, verbose, tolerance, max_it, cardinality):
     pca = LMMPCA(n_components=d, max_it=max_it, tolerance=tolerance,
                  cardinality=cardinality, verbose=verbose)
-
+    RE_col = get_columns_by_prefix(X_train, RE_cols_prefix)[0]
     X_transformed_tr = pca.fit_transform(X_train, RE_col=RE_col)
     X_transformed_te = pca.transform(X_test, RE_col=RE_col)
 
     lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
     y_pred = lm_fit.predict(X_transformed_te)
     sig2bs_mean_est = np.mean(pca.sig2bs_est)
-    return y_pred, [pca.sig2e_est, sig2bs_mean_est], pca.n_iter
+    return y_pred, [pca.sig2e_est, [sig2bs_mean_est]], pca.n_iter
 
 
-def reg_vaepca(X_train, X_test, y_train, y_test, RE_col, d,
+def reg_vaepca(X_train, X_test, y_train, y_test, RE_cols_prefix, d,
                x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
-               verbose, ignore_RE=False):
+               n_sig2bs, verbose, ignore_RE=False):
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
     else:
         X_train, X_test = process_one_hot_encoding(
-            X_train, X_test, x_cols, RE_col)
+            X_train, X_test, x_cols, RE_cols_prefix)
     vae = VAE(X_train.shape[1], d, batch_size, epochs, patience, n_neurons,
               dropout, activation, verbose)
 
@@ -69,56 +71,59 @@ def reg_vaepca(X_train, X_test, y_train, y_test, RE_col, d,
     lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
     y_pred = lm_fit.predict(X_transformed_te)
     n_epochs = len(vae.get_history().history['loss'])
-    return y_pred, X_reconstructed_te, [None, None], n_epochs
+    none_sigmas = [None for _ in range(n_sig2bs)]
+    return y_pred, X_reconstructed_te, [None, none_sigmas], n_epochs
 
 
-def reg_lmmvae(X_train, X_test, y_train, y_test, RE_col, q, d, x_cols, re_prior, batch_size,
-               epochs, patience, n_neurons, dropout, activation, verbose, U, B):
-    lmmvae = LMMVAE(X_train[x_cols].shape[1], x_cols, RE_col, q, d, re_prior, batch_size, epochs, patience, n_neurons,
+def reg_lmmvae(X_train, X_test, y_train, y_test, RE_cols_prefix, q, d, x_cols, re_prior, batch_size,
+               epochs, patience, n_neurons, dropout, activation, verbose, U, B_list):
+    RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix)
+    lmmvae = LMMVAE(X_train[x_cols].shape[1], x_cols, RE_cols, q, d, re_prior, batch_size, epochs, patience, n_neurons,
                     dropout, activation, verbose)
 
     # scaler = StandardScaler(with_std=False)
     # X_train_x_cols = pd.DataFrame(scaler.fit_transform(X_train[x_cols]), index=X_train.index, columns=x_cols)
-    # X_train = pd.concat([X_train_x_cols, X_train[RE_col]], axis=1)
+    # X_train = pd.concat([X_train_x_cols, X_train[RE_cols]], axis=1)
     # X_test_x_cols = pd.DataFrame(scaler.transform(X_test[x_cols]), index=X_test.index, columns=x_cols)
-    # X_test = pd.concat([X_test_x_cols, X_test[RE_col]], axis=1)
+    # X_test = pd.concat([X_test_x_cols, X_test[RE_cols]], axis=1)
 
-    X_transformed_tr, B_hat = lmmvae.fit_transform(X_train, U, B)
-    X_transformed_te, _ = lmmvae.transform(X_test, U, B)
-    X_reconstructed_te = lmmvae.recostruct(X_transformed_te, X_test['z'], B_hat)
+    X_transformed_tr, B_hat_list, sig2bs_hat_list = lmmvae.fit_transform(X_train, U, B_list)
+    X_transformed_te, _, _ = lmmvae.transform(X_test, U, B_list)
+    X_reconstructed_te = lmmvae.recostruct(X_transformed_te, X_test[RE_cols], B_hat_list)
 
     lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
     y_pred = lm_fit.predict(X_transformed_te)
     n_epochs = len(lmmvae.get_history().history['loss'])
-    return y_pred, X_reconstructed_te, [None, None], n_epochs
+    sig2bs_mean_est = [np.mean(sig2bs) for sig2bs in sig2bs_hat_list]
+    return y_pred, X_reconstructed_te, [None, sig2bs_mean_est], n_epochs
 
 
-def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_col, d, pca_type,
-            thresh, epochs, cardinality, batch_size, patience, n_neurons, dropout,
-            activation, verbose, U, B):
+def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, pca_type,
+            thresh, epochs, qs, batch_size, patience, n_neurons, dropout,
+            activation, verbose, U, B_list):
     gc.collect()
     start = time.time()
     if pca_type == 'ignore':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
-            X_train, X_test, y_train, y_test, x_cols, RE_col, d, verbose, ignore_RE=True)
+            X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, len(qs), verbose, ignore_RE=True)
     elif pca_type == 'ohe':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
-            X_train, X_test, y_train, y_test, x_cols, RE_col, d, verbose)
+            X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, len(qs), verbose)
     elif pca_type == 'lmmpca':
         y_pred, sigmas, n_epochs = reg_lmmpca(
-            X_train, X_test, y_train, y_test, RE_col, d, verbose, thresh, epochs, cardinality)
+            X_train, X_test, y_train, y_test, RE_cols_prefix, d, verbose, thresh, epochs, qs[0])
     elif pca_type == 'vae-ignore':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
-            X_train, X_test, y_train, y_test, RE_col, d, x_cols, batch_size,
-            epochs, patience, n_neurons, dropout, activation, verbose, ignore_RE=True)
+            X_train, X_test, y_train, y_test, RE_cols_prefix, d, x_cols, batch_size,
+            epochs, patience, n_neurons, dropout, activation, len(qs), verbose, ignore_RE=True)
     elif pca_type == 'vae':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
-            X_train, X_test, y_train, y_test, RE_col, d, x_cols, batch_size,
-            epochs, patience, n_neurons, dropout, activation, verbose, ignore_RE=False)
+            X_train, X_test, y_train, y_test, RE_cols_prefix, d, x_cols, batch_size,
+            epochs, patience, n_neurons, dropout, activation, len(qs), verbose, ignore_RE=False)
     elif pca_type == 'lmmvae':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_lmmvae(
-            X_train, X_test, y_train, y_test, RE_col, cardinality, d, x_cols, 1.0, batch_size,
-            epochs, patience, n_neurons, dropout, activation, verbose, U, B)
+            X_train, X_test, y_train, y_test, RE_cols_prefix, qs, d, x_cols, 1.0, batch_size,
+            epochs, patience, n_neurons, dropout, activation, verbose, U, B_list)
     else:
         raise ValueError(f'{pca_type} is an unknown pca_type')
     end = time.time()
