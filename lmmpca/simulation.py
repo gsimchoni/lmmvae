@@ -40,11 +40,11 @@ def run_reg_pca(pca_in, pca_type):
                    pca_in.y_test, pca_in.x_cols, pca_in.RE_cols_prefix, pca_in.d, pca_type,
                    pca_in.thresh, pca_in.epochs, pca_in.qs, pca_in.batch_size,
                    pca_in.patience, pca_in.n_neurons, pca_in.dropout, pca_in.activation,
-                   pca_in.verbose, pca_in.U, pca_in.B_list)
+                   pca_in.beta, pca_in.verbose, pca_in.U, pca_in.B_list)
 
 
 def summarize_sim(pca_in, res, pca_type):
-    res = [pca_in.N, pca_in.p, pca_in.d, pca_in.sig2e] + list(pca_in.qs) + list(pca_in.sig2bs_means) + \
+    res = [pca_in.N, pca_in.p, pca_in.d, pca_in.sig2e, pca_in.beta] + list(pca_in.qs) + list(pca_in.sig2bs_means) + \
         [pca_in.sig2bs_identical, pca_in.thresh, pca_in.k, pca_type, res.metric_y,
         res.metric_X, res.sigmas[0]] + res.sigmas[1] + [res.n_epochs, res.time]
     return res
@@ -57,9 +57,10 @@ def simulation(out_file, params):
     qs_names =  list(map(lambda x: 'q' + str(x), range(n_categoricals)))
     sig2bs_names =  list(map(lambda x: 'sig2b' + str(x), range(n_sig2bs)))
     sig2bs_est_names =  list(map(lambda x: 'sig2b_est' + str(x), range(n_sig2bs)))
+    beta_list = params['beta_list'] if 'beta_list' in params else [1/params['n_fixed_features']]
     counter = Count().gen()
     res_df = pd.DataFrame(
-        columns=['N', 'p', 'd', 'sig2e'] + qs_names + sig2bs_names + ['sig2bs_identical', 'thresh'] +
+        columns=['N', 'p', 'd', 'sig2e', 'beta'] + qs_names + sig2bs_names + ['sig2bs_identical', 'thresh'] +
         ['experiment', 'exp_type', 'mse_y', 'mse_X', 'sig2e_est'] + sig2bs_est_names + ['n_epochs', 'time'])
     for N in params['N_list']:
         for sig2e in params['sig2e_list']:
@@ -67,20 +68,21 @@ def simulation(out_file, params):
                 for sig2bs_means in product(*params['sig2bs_mean_list']):
                     for sig2bs_identical in params['sig2bs_identical_list']:
                         for latent_dimension in params['latent_dimension_list']:
-                            logger.info(f'N: {N}, qs: {", ".join(map(str, qs))}, d: {latent_dimension}, '
-                                        f'sig2e: {sig2e:.2f}, sig2bs_mean: {", ".join(map(str, sig2bs_means))}, '
-                                        f'sig2bs_identical: {sig2bs_identical}')
-                            for k in range(params['n_iter']):
-                                pca_data = generate_data(N, qs, latent_dimension,
-                                                         sig2e, sig2bs_means, sig2bs_identical, params)
-                                logger.info(' iteration: %d' % k)
-                                pca_in = PCAInput(*pca_data, N, params['n_fixed_features'],
-                                                  qs, latent_dimension,
-                                                  sig2e, sig2bs_means, sig2bs_identical, k,
-                                                  params['epochs'], params['RE_cols_prefix'],
-                                                  params['thresh'], params['batch_size'],
-                                                  params['patience'],
-                                                  params['n_neurons'], params['dropout'],
-                                                  params['activation'], params['verbose'])
-                                iterate_pca_types(counter, res_df, out_file,
-                                                  pca_in, params['pca_types'], params['verbose'])
+                            for beta in beta_list:
+                                logger.info(f'N: {N}, qs: {", ".join(map(str, qs))}, d: {latent_dimension}, '
+                                            f'sig2e: {sig2e}, sig2bs_mean: {", ".join(map(str, sig2bs_means))}, '
+                                            f'sig2bs_identical: {sig2bs_identical}, beta: {beta}')
+                                for k in range(params['n_iter']):
+                                    pca_data = generate_data(N, qs, latent_dimension,
+                                                            sig2e, sig2bs_means, sig2bs_identical, params)
+                                    logger.info(' iteration: %d' % k)
+                                    pca_in = PCAInput(*pca_data, N, params['n_fixed_features'],
+                                                    qs, latent_dimension,
+                                                    sig2e, sig2bs_means, sig2bs_identical, beta, k,
+                                                    params['epochs'], params['RE_cols_prefix'],
+                                                    params['thresh'], params['batch_size'],
+                                                    params['patience'],
+                                                    params['n_neurons'], params['dropout'],
+                                                    params['activation'], params['verbose'])
+                                    iterate_pca_types(counter, res_df, out_file,
+                                                    pca_in, params['pca_types'], params['verbose'])

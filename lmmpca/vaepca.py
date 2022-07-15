@@ -61,7 +61,7 @@ class VAE:
     """
 
     def __init__(self, p, d, batch_size, epochs, patience, n_neurons,
-                 dropout, activation, verbose) -> None:
+                 dropout, activation, beta, verbose) -> None:
         super().__init__()
         self.batch_size = batch_size
         self.epochs = epochs
@@ -98,8 +98,8 @@ class VAE:
             1 + codings_log_var -
             K.exp(codings_log_var) - K.square(codings_mean),
             axis=-1)
-        self.variational_ae.add_loss(K.mean(kl_loss))
-        self.variational_ae.add_loss(p * MeanSquaredError()(inputs, reconstructions))
+        self.variational_ae.add_loss(beta * K.mean(kl_loss))
+        self.variational_ae.add_loss(MeanSquaredError()(inputs, reconstructions))
         self.variational_ae.compile(optimizer='adam')
 
     def _fit(self, X):
@@ -139,7 +139,7 @@ class LMMVAE:
     """
 
     def __init__(self, p, x_cols, RE_cols, qs, d, re_prior, batch_size, epochs, patience, n_neurons,
-                 dropout, activation, verbose) -> None:
+                 dropout, activation, beta, verbose) -> None:
         super().__init__()
         K.clear_session()
         self.batch_size = batch_size
@@ -231,9 +231,9 @@ class LMMVAE:
                 1 + re_codings_log_var - self.re_prior -
                 K.exp(re_codings_log_var - self.re_prior) - K.square(re_codings_mean) * K.exp(-self.re_prior),
                 axis=-1)
-            self.variational_ae.add_loss(K.mean(re_kl_loss))
-        self.variational_ae.add_loss(K.mean(kl_loss))
-        self.variational_ae.add_loss(p * MeanSquaredError()(X_input, reconstructions))
+            self.variational_ae.add_loss(beta * K.mean(re_kl_loss))
+        self.variational_ae.add_loss(beta * K.mean(kl_loss))
+        self.variational_ae.add_loss(MeanSquaredError()(X_input, reconstructions))
         self.variational_ae.compile(optimizer='adam')
 
     def _fit(self, X):

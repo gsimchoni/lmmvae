@@ -13,7 +13,7 @@ Data = namedtuple('PCAData', [
 ])
 
 PCAInput = namedtuple('PCAInput', list(Data._fields) + ['N', 'p', 'qs', 'd',
-                                                        'sig2e', 'sig2bs_means', 'sig2bs_identical',
+                                                        'sig2e', 'sig2bs_means', 'sig2bs_identical', 'beta',
                                                         'k', 'epochs', 'RE_cols_prefix',
                                                         'thresh', 'batch_size', 'patience', 'n_neurons', 'dropout',
                                                         'activation', 'verbose'])
