@@ -12,9 +12,10 @@ Data = namedtuple('PCAData', [
     'X_train', 'X_test', 'y_train', 'y_test', 'W', 'U', 'B_list', 'x_cols'
 ])
 
-PCAInput = namedtuple('PCAInput', list(Data._fields) + ['N', 'p', 'qs', 'd',
-                                                        'sig2e', 'sig2bs_means', 'sig2bs_identical', 'beta',
-                                                        'k', 'epochs', 'RE_cols_prefix',
+PCAInput = namedtuple('PCAInput', list(Data._fields) + ['mode', 'N', 'p', 'qs', 'd',
+                                                        'sig2e', 'sig2bs_means', 'sig2bs_spatial', 'q_spatial',
+                                                        'sig2bs_identical', 'beta',
+                                                        'k', 'n_sig2bs_spatial', 'epochs', 'RE_cols_prefix',
                                                         'thresh', 'batch_size', 'patience', 'n_neurons', 'dropout',
                                                         'activation', 'verbose'])
 
@@ -55,7 +56,7 @@ def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix):
     return X_train_new, X_test_new
 
 
-def generate_data(n, qs, d, sig2e, sig2bs_means, sig2bs_identical, params):
+def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_identical, params):
     p = params['n_fixed_features']
     W = np.random.normal(size=p * d).reshape(p, d)
     U = np.random.normal(size=n * d).reshape(n, d)
