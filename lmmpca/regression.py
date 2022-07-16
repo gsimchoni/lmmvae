@@ -78,10 +78,12 @@ def reg_vaepca(X_train, X_test, y_train, y_test, RE_cols_prefix, d, n_sig2bs_spa
     return y_pred, X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], n_epochs
 
 
-def reg_lmmvae(X_train, X_test, y_train, y_test, RE_cols_prefix, q, d, n_sig2bs_spatial, x_cols, re_prior, batch_size,
-               epochs, patience, n_neurons, dropout, activation, beta, verbose, U, B_list):
+def reg_lmmvae(X_train, X_test, y_train, y_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs_spatial, x_cols, re_prior, batch_size,
+               epochs, patience, n_neurons, dropout, activation, mode, beta, verbose, U, B_list):
     RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix)
-    lmmvae = LMMVAE(X_train[x_cols].shape[1], x_cols, RE_cols, q, d, re_prior, batch_size, epochs, patience, n_neurons,
+    if mode in ['spatial']:
+        x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2']]
+    lmmvae = LMMVAE(mode, X_train[x_cols].shape[1], x_cols, RE_cols, qs, q_spatial, d, re_prior, batch_size, epochs, patience, n_neurons,
                     dropout, activation, beta, verbose)
 
     # scaler = StandardScaler(with_std=False)
@@ -99,12 +101,15 @@ def reg_lmmvae(X_train, X_test, y_train, y_test, RE_cols_prefix, q, d, n_sig2bs_
     n_epochs = len(lmmvae.get_history().history['loss'])
     sig2bs_mean_est = [np.mean(sig2bs) for sig2bs in sig2bs_hat_list]
     none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
+    # TODO: get rid of this
+    if mode == 'spatial':
+        sig2bs_mean_est = []
     return y_pred, X_reconstructed_te, [None, sig2bs_mean_est, none_sigmas_spatial], n_epochs
 
 
 def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, pca_type,
-            thresh, epochs, qs, n_sig2bs_spatial, batch_size, patience, n_neurons, dropout,
-            activation, beta, verbose, U, B_list):
+            thresh, epochs, qs, q_spatial, n_sig2bs_spatial, batch_size, patience, n_neurons, dropout,
+            activation, mode, beta, verbose, U, B_list):
     gc.collect()
     start = time.time()
     if pca_type == 'ignore':
@@ -126,11 +131,13 @@ def reg_pca(X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, pca_typ
             epochs, patience, n_neurons, dropout, activation, len(qs), beta, verbose, ignore_RE=False)
     elif pca_type == 'lmmvae':
         y_pred, X_reconstructed_te, sigmas, n_epochs = reg_lmmvae(
-            X_train, X_test, y_train, y_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, 1.0, batch_size,
-            epochs, patience, n_neurons, dropout, activation, beta, verbose, U, B_list)
+            X_train, X_test, y_train, y_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs_spatial, x_cols, 1.0, batch_size,
+            epochs, patience, n_neurons, dropout, activation, mode, beta, verbose, U, B_list)
     else:
         raise ValueError(f'{pca_type} is an unknown pca_type')
     end = time.time()
+    if mode in ['spatial']:
+        x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2']]
     metric_y = mse(y_test, y_pred)
     metric_X = mse(X_test[x_cols].values, X_reconstructed_te[:, :len(x_cols)])
     return PCAResult(metric_y, metric_X, sigmas, n_epochs, end - start)

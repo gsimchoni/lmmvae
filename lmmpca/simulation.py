@@ -38,9 +38,9 @@ def iterate_pca_types(counter, res_df, out_file, pca_in, pca_types, verbose):
 def run_reg_pca(pca_in, pca_type):
     return reg_pca(pca_in.X_train, pca_in.X_test, pca_in.y_train,
                    pca_in.y_test, pca_in.x_cols, pca_in.RE_cols_prefix, pca_in.d, pca_type,
-                   pca_in.thresh, pca_in.epochs, pca_in.qs, pca_in.n_sig2bs_spatial, pca_in.batch_size,
+                   pca_in.thresh, pca_in.epochs, pca_in.qs, pca_in.q_spatial, pca_in.n_sig2bs_spatial, pca_in.batch_size,
                    pca_in.patience, pca_in.n_neurons, pca_in.dropout, pca_in.activation,
-                   pca_in.beta, pca_in.verbose, pca_in.U, pca_in.B_list)
+                   pca_in.mode, pca_in.beta, pca_in.verbose, pca_in.U, pca_in.B_list)
 
 
 def summarize_sim(pca_in, res, pca_type):
@@ -65,7 +65,7 @@ def simulation(out_file, params):
     sig2bs_spatial_est_names = []
     q_spatial_name = []
     q_spatial_list = [None]
-    if mode == 'intercepts':
+    if mode == 'categorical':
         assert n_sig2bs == n_categoricals
     elif mode == 'spatial':
         assert n_categoricals == 0
@@ -99,7 +99,7 @@ def simulation(out_file, params):
                                                     f'sig2bs_identical: {sig2bs_identical}, beta: {beta}')
                                         for k in range(params['n_iter']):
                                             pca_data = generate_data(mode, N, qs, q_spatial, latent_dimension,
-                                                                    sig2e, sig2bs_means, sig2bs_identical, params)
+                                                                    sig2e, sig2bs_means, sig2bs_spatial, sig2bs_identical, params)
                                             logger.info(' iteration: %d' % k)
                                             pca_in = PCAInput(*pca_data, mode, N, params['n_fixed_features'],
                                                             qs, latent_dimension,

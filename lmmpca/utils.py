@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sparse
 from sklearn.model_selection import train_test_split
+from scipy.spatial.distance import pdist, squareform
 
 PCAResult = namedtuple(
     'PCAResult', ['metric_y', 'metric_X', 'sigmas', 'n_epochs', 'time'])
@@ -56,7 +57,7 @@ def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix):
     return X_train_new, X_test_new
 
 
-def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_identical, params):
+def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial_mean, sig2bs_identical, params):
     p = params['n_fixed_features']
     W = np.random.normal(size=p * d).reshape(p, d)
     U = np.random.normal(size=n * d).reshape(n, d)
@@ -68,34 +69,70 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_identic
     else:
         fU = UW
     X = fU + mu + e
-    Z_idx_list = []
-    B_list = []
-    for k, q in enumerate(qs):
-        sig2bs_mean = sig2bs_means[k]
-        if sig2bs_mean < 1:
-            fs_factor = sig2bs_mean
+    if mode == 'categorical':
+        Z_idx_list = []
+        B_list = []
+        for k, q in enumerate(qs):
+            sig2bs_mean = sig2bs_means[k]
+            if sig2bs_mean < 1:
+                fs_factor = sig2bs_mean
+            else:
+                fs_factor = 1
+            if sig2bs_identical:
+                sig2bs = np.repeat(sig2bs_mean, p)
+            else:
+                sig2bs = (np.random.poisson(sig2bs_mean, p) + 1) * fs_factor
+            D = np.diag(sig2bs)
+            B = np.random.multivariate_normal(np.zeros(p), D, q)
+            B_list.append(B)
+            fs = np.random.poisson(params['n_per_cat'], q) + 1
+            fs_sum = fs.sum()
+            ps = fs / fs_sum
+            ns = np.random.multinomial(n, ps)
+            Z_idx = np.repeat(range(q), ns)
+            Z = get_dummies(Z_idx, q)
+            X += Z @ B
+            Z_idx_list.append(Z_idx)
+    if mode == 'spatial':
+        if sig2bs_spatial_mean[0] < 1:
+            fs_factor = sig2bs_spatial_mean[0]
         else:
             fs_factor = 1
         if sig2bs_identical:
-            sig2bs = np.repeat(sig2bs_mean, p)
+            sig2bs_spatial = np.repeat(sig2bs_spatial_mean[0], p)
         else:
-            sig2bs = (np.random.poisson(sig2bs_mean, p) + 1) * fs_factor
-        D = np.diag(sig2bs)
-        B = np.random.multivariate_normal(np.zeros(p), D, q)
-        B_list.append(B)
-        fs = np.random.poisson(params['n_per_cat'], q) + 1
+            sig2bs_spatial = (np.random.poisson(sig2bs_spatial_mean[0], p) + 1) * fs_factor
+        # D = np.diag(sig2bs_spatial)
+        coords = np.stack([np.random.uniform(-10, 10, q_spatial), np.random.uniform(-10, 10, q_spatial)], axis=1)
+        # ind = np.lexsort((coords[:, 1], coords[:, 0]))    
+        # coords = coords[ind]
+        dist_matrix = squareform(pdist(coords)) ** 2
+        K = np.exp(-dist_matrix / (2 * sig2bs_spatial_mean[1]))
+        b_list = []
+        for k in range(p):
+            b_k = np.random.multivariate_normal(np.zeros(q_spatial), sig2bs_spatial[k] * K, 1)
+            b_list.append(b_k)
+        B = np.concatenate(b_list, axis=0).T
+        B_list = [B]
+        fs = np.random.poisson(params['n_per_cat'], q_spatial) + 1
         fs_sum = fs.sum()
-        ps = fs / fs_sum
+        ps = fs/fs_sum
         ns = np.random.multinomial(n, ps)
-        Z_idx = np.repeat(range(q), ns)
-        Z = get_dummies(Z_idx, q)
+        Z_idx = np.repeat(range(q_spatial), ns)
+        Z_idx_list = [Z_idx]
+        Z = get_dummies(Z_idx, q_spatial)
         X += Z @ B
-        Z_idx_list.append(Z_idx)
+        coords_df = pd.DataFrame(coords[Z_idx])
+        co_cols = ['D1', 'D2']
+        coords_df.columns = co_cols
     df = pd.DataFrame(X)
     x_cols = ['X' + str(i) for i in range(p)]
     df.columns = x_cols
     for k, Z_idx in enumerate(Z_idx_list):
         df['z' + str(k)] = Z_idx
+    if mode == 'spatial':
+        df = pd.concat([df, coords_df], axis=1)
+        x_cols.extend(co_cols)
     y = U @ np.ones(d) + np.random.normal(size=n, scale=1.0)
     df['y'] = y
     test_size = params['test_size'] if 'test_size' in params else 0.2

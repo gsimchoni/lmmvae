@@ -138,7 +138,7 @@ class LMMVAE:
 
     """
 
-    def __init__(self, p, x_cols, RE_cols, qs, d, re_prior, batch_size, epochs, patience, n_neurons,
+    def __init__(self, mode, p, x_cols, RE_cols, qs, q_spatial, d, re_prior, batch_size, epochs, patience, n_neurons,
                  dropout, activation, beta, verbose) -> None:
         super().__init__()
         K.clear_session()
@@ -151,20 +151,23 @@ class LMMVAE:
         self.x_cols = x_cols
         self.RE_cols = RE_cols
         self.p = p
+        self.mode = mode
         self.qs = qs
+        if self.mode == 'spatial':
+            self.qs = [q_spatial]
         self.callbacks = [EarlyStopping(monitor='val_loss',
                                         patience=self.epochs if patience is None else patience)]
         X_input = Input(shape=p)
         Z_inputs = []
         Z_mats = []
-        n_RE_inputs = len(qs)
+        n_RE_inputs = len(self.qs)
         for i in range(n_RE_inputs):
             Z_input = Input(shape=(1,), dtype=tf.int64)
             Z_inputs.append(Z_input)
             if version.parse(tf.__version__) >= version.parse('2.8'):
-                Z = CategoryEncoding(num_tokens=qs[i], output_mode='one_hot')(Z_input)
+                Z = CategoryEncoding(num_tokens=self.qs[i], output_mode='one_hot')(Z_input)
             else:
-                Z = CategoryEncoding(max_tokens=qs[i], output_mode='binary')(Z_input)
+                Z = CategoryEncoding(max_tokens=self.qs[i], output_mode='binary')(Z_input)
             Z_mats.append(Z)
         # z = Concatenate()([X_input] + Z_mats)
         # z = add_layers_functional(z, n_neurons, dropout, activation, p)
@@ -205,7 +208,7 @@ class LMMVAE:
         for i in range(n_RE_inputs):
             Z = Z_mats[i]
             decoder_re_inputs = decoder_re_inputs_list[i]
-            B = tf.math.divide_no_nan(K.dot(K.transpose(Z), decoder_re_inputs), K.reshape(K.sum(Z, axis=0), (qs[i], 1)))
+            B = tf.math.divide_no_nan(K.dot(K.transpose(Z), decoder_re_inputs), K.reshape(K.sum(Z, axis=0), (self.qs[i], 1)))
             ZB = K.dot(Z, B)
             outputs += ZB
         self.variational_decoder = Model(
