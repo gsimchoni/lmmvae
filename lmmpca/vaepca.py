@@ -139,7 +139,7 @@ class LMMVAE:
     """
 
     def __init__(self, mode, p, x_cols, RE_cols, qs, q_spatial, d, re_prior, batch_size, epochs, patience, n_neurons,
-                 dropout, activation, beta, verbose) -> None:
+                 dropout, activation, beta, kernel, verbose) -> None:
         super().__init__()
         K.clear_session()
         self.batch_size = batch_size
@@ -153,14 +153,19 @@ class LMMVAE:
         self.p = p
         self.mode = mode
         self.qs = qs
-        if self.mode == 'spatial':
+        self.kernel_inv = None
+        self.kernel_inv_diag = None
+        self.kernel_log_det = None
+        if self.mode in ['spatial', 'spatial_fit_categorical']:
             self.qs = [q_spatial]
+            self.kernel_inv_diag = np.diagonal(np.linalg.inv(kernel)).astype(np.float32)
+            _, self.kernel_log_det = np.linalg.slogdet(kernel)
         self.callbacks = [EarlyStopping(monitor='val_loss',
                                         patience=self.epochs if patience is None else patience)]
         X_input = Input(shape=p)
         Z_inputs = []
         Z_mats = []
-        n_RE_inputs = len(self.qs)
+        n_RE_inputs = len(self.qs) if mode == 'categorical' else 1
         for i in range(n_RE_inputs):
             Z_input = Input(shape=(1,), dtype=tf.int64)
             Z_inputs.append(Z_input)
@@ -227,14 +232,29 @@ class LMMVAE:
             1 + codings_log_var -
             K.exp(codings_log_var) - K.square(codings_mean),
             axis=-1)
-        for i in range(n_RE_inputs):
-            re_codings_mean = re_codings_mean_list[i]
-            re_codings_log_var = re_codings_log_var_list[i]
-            re_kl_loss = -0.5 * K.sum(
-                1 + re_codings_log_var - self.re_prior -
-                K.exp(re_codings_log_var - self.re_prior) - K.square(re_codings_mean) * K.exp(-self.re_prior),
-                axis=-1)
+        if mode in ['categorical', 'spatial_fit_categorical']:
+            for i in range(n_RE_inputs):
+                re_codings_mean = re_codings_mean_list[i]
+                re_codings_log_var = re_codings_log_var_list[i]
+                re_kl_loss = -0.5 * K.sum(
+                    1 + re_codings_log_var - self.re_prior -
+                    K.exp(re_codings_log_var - self.re_prior) - K.square(re_codings_mean) * K.exp(-self.re_prior),
+                    axis=-1)
+                self.variational_ae.add_loss(beta * K.mean(re_kl_loss))
+        elif mode == 'spatial':
+            re_codings_mean = re_codings_mean_list[0]
+            re_codings_log_var = re_codings_log_var_list[0]
+            # re_kl_loss = 0.5 * self.p * self.kernel_log_det +
+            re_kl_loss = - 0.5 * self.qs[0] * K.sum(
+                    1 + re_codings_log_var - re_prior, axis=-1) + 0.5 * K.sum(
+                        K.square(tf.tile(re_codings_mean, (1, self.qs[0]))) * tf.repeat(self.kernel_inv_diag, self.p) * tf.repeat(K.exp(-self.re_prior), self.qs[0] * self.p),
+                    axis=-1) + 0.5 * K.sum(
+                        tf.tile(K.exp(re_codings_log_var), (1, self.qs[0])) * tf.repeat(self.kernel_inv_diag, self.p) * tf.repeat(K.exp(-self.re_prior), self.qs[0] * self.p),
+                    axis=-1)
+                    # NOTE: if re_prior would have been a vector, this would have been tf.tile(K.exp(-self.re_prior), self.qs[0] * self.p), not repeat
             self.variational_ae.add_loss(beta * K.mean(re_kl_loss))
+        else:
+            raise ValueError(f'{mode} is unknown mode')
         self.variational_ae.add_loss(beta * K.mean(kl_loss))
         self.variational_ae.add_loss(MeanSquaredError()(X_input, reconstructions))
         self.variational_ae.compile(optimizer='adam')

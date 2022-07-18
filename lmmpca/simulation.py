@@ -40,7 +40,7 @@ def run_reg_pca(pca_in, pca_type):
                    pca_in.y_test, pca_in.x_cols, pca_in.RE_cols_prefix, pca_in.d, pca_type,
                    pca_in.thresh, pca_in.epochs, pca_in.qs, pca_in.q_spatial, pca_in.n_sig2bs_spatial, pca_in.batch_size,
                    pca_in.patience, pca_in.n_neurons, pca_in.dropout, pca_in.activation,
-                   pca_in.mode, pca_in.beta, pca_in.verbose, pca_in.U, pca_in.B_list)
+                   pca_in.mode, pca_in.beta, pca_in.kernel, pca_in.verbose, pca_in.U, pca_in.B_list)
 
 
 def summarize_sim(pca_in, res, pca_type):
@@ -67,7 +67,7 @@ def simulation(out_file, params):
     q_spatial_list = [None]
     if mode == 'categorical':
         assert n_sig2bs == n_categoricals
-    elif mode == 'spatial':
+    elif mode in ['spatial', 'spatial_fit_categorical']:
         assert n_categoricals == 0
         assert n_sig2bs == 0
         assert n_sig2bs_spatial == 2

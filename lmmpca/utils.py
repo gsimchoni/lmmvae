@@ -10,7 +10,7 @@ PCAResult = namedtuple(
     'PCAResult', ['metric_y', 'metric_X', 'sigmas', 'n_epochs', 'time'])
 
 Data = namedtuple('PCAData', [
-    'X_train', 'X_test', 'y_train', 'y_test', 'W', 'U', 'B_list', 'x_cols'
+    'X_train', 'X_test', 'y_train', 'y_test', 'W', 'U', 'B_list', 'x_cols', 'kernel'
 ])
 
 PCAInput = namedtuple('PCAInput', list(Data._fields) + ['mode', 'N', 'p', 'qs', 'd',
@@ -64,6 +64,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     mu = np.random.uniform(-10, 10, size=p)#np.zeros(p)
     e = np.random.normal(scale=np.sqrt(sig2e), size=n * p).reshape(n, p)
     UW = U @ W.T
+    kernel = None
     if params['X_non_linear']:
         fU = (U[:,None,:]*W[None,:,:]*np.cos(U[:,None,:]*W[None,:,:])).sum(axis=2)
     else:
@@ -93,7 +94,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
             Z = get_dummies(Z_idx, q)
             X += Z @ B
             Z_idx_list.append(Z_idx)
-    if mode == 'spatial':
+    if mode in ['spatial', 'spatial_fit_categorical']:
         if sig2bs_spatial_mean[0] < 1:
             fs_factor = sig2bs_spatial_mean[0]
         else:
@@ -102,21 +103,20 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
             sig2bs_spatial = np.repeat(sig2bs_spatial_mean[0], p)
         else:
             sig2bs_spatial = (np.random.poisson(sig2bs_spatial_mean[0], p) + 1) * fs_factor
-        # D = np.diag(sig2bs_spatial)
         coords = np.stack([np.random.uniform(-10, 10, q_spatial), np.random.uniform(-10, 10, q_spatial)], axis=1)
         # ind = np.lexsort((coords[:, 1], coords[:, 0]))    
         # coords = coords[ind]
         dist_matrix = squareform(pdist(coords)) ** 2
-        K = np.exp(-dist_matrix / (2 * sig2bs_spatial_mean[1]))
+        kernel = np.exp(-dist_matrix / (2 * sig2bs_spatial_mean[1]))
         b_list = []
         for k in range(p):
-            b_k = np.random.multivariate_normal(np.zeros(q_spatial), sig2bs_spatial[k] * K, 1)
+            b_k = np.random.multivariate_normal(np.zeros(q_spatial), sig2bs_spatial[k] * kernel, 1)
             b_list.append(b_k)
         B = np.concatenate(b_list, axis=0).T
         B_list = [B]
         fs = np.random.poisson(params['n_per_cat'], q_spatial) + 1
         fs_sum = fs.sum()
-        ps = fs/fs_sum
+        ps = fs / fs_sum
         ns = np.random.multinomial(n, ps)
         Z_idx = np.repeat(range(q_spatial), ns)
         Z_idx_list = [Z_idx]
@@ -130,7 +130,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     df.columns = x_cols
     for k, Z_idx in enumerate(Z_idx_list):
         df['z' + str(k)] = Z_idx
-    if mode == 'spatial':
+    if mode in ['spatial', 'spatial_fit_categorical']:
         df = pd.concat([df, coords_df], axis=1)
         x_cols.extend(co_cols)
     y = U @ np.ones(d) + np.random.normal(size=n, scale=1.0)
@@ -144,4 +144,4 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     y_train = y_train[X_train.index]
     y_test = y_test[X_test.index]
     U_train = U[X_train.index]
-    return Data(X_train, X_test, y_train, y_test, W, U_train, B_list, x_cols)
+    return Data(X_train, X_test, y_train, y_test, W, U_train, B_list, x_cols, kernel)
