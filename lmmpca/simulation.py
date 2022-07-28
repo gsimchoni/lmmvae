@@ -40,7 +40,7 @@ def run_reg_pca(pca_in, pca_type):
                    pca_in.y_test, pca_in.x_cols, pca_in.RE_cols_prefix, pca_in.d, pca_type,
                    pca_in.thresh, pca_in.epochs, pca_in.qs, pca_in.q_spatial, pca_in.n_sig2bs_spatial, pca_in.batch_size,
                    pca_in.patience, pca_in.n_neurons, pca_in.dropout, pca_in.activation,
-                   pca_in.mode, pca_in.beta, pca_in.kernel, pca_in.verbose, pca_in.U, pca_in.B_list)
+                   pca_in.mode, pca_in.beta, pca_in.re_prior, pca_in.kernel, pca_in.verbose, pca_in.U, pca_in.B_list)
 
 
 def summarize_sim(pca_in, res, pca_type):
@@ -48,8 +48,7 @@ def summarize_sim(pca_in, res, pca_type):
         q_spatial = [pca_in.q_spatial]
     else:
         q_spatial = []
-    # qs_names + q_spatial_name + sig2bs_names + sig2bs_spatial_names
-    res = [pca_in.mode, pca_in.N, pca_in.p, pca_in.d, pca_in.sig2e, pca_in.beta] + \
+    res = [pca_in.mode, pca_in.N, pca_in.p, pca_in.d, pca_in.sig2e, pca_in.beta, pca_in.re_prior] + \
         list(pca_in.qs) + q_spatial + list(pca_in.sig2bs_means) + list(pca_in.sig2bs_spatial) + \
         [pca_in.sig2bs_identical, pca_in.thresh, pca_in.k, pca_type, res.metric_y,
         res.metric_X, res.sigmas[0]] + res.sigmas[1] + res.sigmas[2] + [res.n_epochs, res.time]
@@ -80,10 +79,11 @@ def simulation(out_file, params):
     qs_names =  list(map(lambda x: 'q' + str(x), range(n_categoricals)))
     sig2bs_names =  list(map(lambda x: 'sig2b' + str(x), range(n_sig2bs)))
     sig2bs_est_names =  list(map(lambda x: 'sig2b_est' + str(x), range(n_sig2bs)))
-    beta_list = params['beta_list'] if 'beta_list' in params else [1/params['n_fixed_features']]
+    beta_list = params.get('beta_list', [1/params['n_fixed_features']])
+    re_prior = params.get('re_prior', 1.0)
     counter = Count().gen()
     res_df = pd.DataFrame(
-        columns=['mode', 'N', 'p', 'd', 'sig2e', 'beta'] + qs_names + q_spatial_name + sig2bs_names + sig2bs_spatial_names + ['sig2bs_identical', 'thresh'] +
+        columns=['mode', 'N', 'p', 'd', 'sig2e', 'beta', 're_prior'] + qs_names + q_spatial_name + sig2bs_names + sig2bs_spatial_names + ['sig2bs_identical', 'thresh'] +
         ['experiment', 'exp_type', 'mse_y', 'mse_X', 'sig2e_est'] + sig2bs_est_names + sig2bs_spatial_est_names + ['n_epochs', 'time'])
     for N in params['N_list']:
         for sig2e in params['sig2e_list']:
@@ -103,7 +103,8 @@ def simulation(out_file, params):
                                             logger.info(' iteration: %d' % k)
                                             pca_in = PCAInput(*pca_data, mode, N, params['n_fixed_features'],
                                                             qs, latent_dimension,
-                                                            sig2e, sig2bs_means, sig2bs_spatial, q_spatial, sig2bs_identical, beta, k,
+                                                            sig2e, sig2bs_means, sig2bs_spatial, q_spatial, sig2bs_identical,
+                                                            beta, re_prior, k,
                                                             n_sig2bs_spatial,
                                                             params['epochs'], params['RE_cols_prefix'],
                                                             params['thresh'], params['batch_size'],

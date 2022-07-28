@@ -15,7 +15,7 @@ Data = namedtuple('PCAData', [
 
 PCAInput = namedtuple('PCAInput', list(Data._fields) + ['mode', 'N', 'p', 'qs', 'd',
                                                         'sig2e', 'sig2bs_means', 'sig2bs_spatial', 'q_spatial',
-                                                        'sig2bs_identical', 'beta',
+                                                        'sig2bs_identical', 'beta', 're_prior',
                                                         'k', 'n_sig2bs_spatial', 'epochs', 'RE_cols_prefix',
                                                         'thresh', 'batch_size', 'patience', 'n_neurons', 'dropout',
                                                         'activation', 'verbose'])
@@ -135,7 +135,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         x_cols.extend(co_cols)
     y = U @ np.ones(d) + np.random.normal(size=n, scale=1.0)
     df['y'] = y
-    test_size = params['test_size'] if 'test_size' in params else 0.2
+    test_size = params.get('test_size', 0.2)
     X_train, X_test,  y_train, y_test = train_test_split(
         df.drop('y', axis=1), df['y'], test_size=test_size)
     # TODO: why is this necessary?
