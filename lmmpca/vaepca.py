@@ -164,7 +164,11 @@ class LMMVAE:
         self.kernel_log_det = None
         if self.mode in ['spatial', 'spatial_fit_categorical']:
             self.qs = [q_spatial]
-            self.kernel_root = np.linalg.cholesky(kernel)
+            try:
+                self.kernel_root = np.linalg.cholesky(kernel)
+            except:
+                jitter = 0.001
+                self.kernel_root = np.linalg.cholesky(kernel + jitter * np.eye(kernel.shape[0]))
             kernel_root_inv = np.linalg.solve(self.kernel_root, np.eye(self.kernel_root.shape[0]))
             kernel_root_inv = np.clip(kernel_root_inv, -10, 10)
             self.kernel_inv = tf.constant(np.dot(kernel_root_inv.T, kernel_root_inv).astype(np.float32))
@@ -204,7 +208,7 @@ class LMMVAE:
             re_codings_mean_list = []
             re_codings_log_var_list = []
             re_codings_list = []
-            for _ in range(self.p):
+            for i in range(self.p):
                 z2 = add_layers_functional(X_input, n_neurons, dropout, activation, p)
                 re_codings_mean = Dense(self.qs[0])(z2)
                 re_codings_mean_list.append(re_codings_mean)
@@ -228,7 +232,7 @@ class LMMVAE:
                 decoder_re_inputs = Input(shape=p)
                 decoder_re_inputs_list.append(decoder_re_inputs)
         elif mode == 'spatial':
-            for _ in range(self.p):
+            for i in range(self.p):
                 decoder_re_inputs = Input(shape=self.qs[0])
                 decoder_re_inputs_list.append(decoder_re_inputs)
         
@@ -247,7 +251,7 @@ class LMMVAE:
         elif mode == 'spatial':
             B_list = []
             Z = Z_mats[0]
-            for _ in range(self.p):
+            for i in range(self.p):
                 decoder_re_inputs = decoder_re_inputs_list[i]
                 B_k = K.reshape(K.mean(decoder_re_inputs, axis=0), (self.qs[0], 1))
                 B_list.append(B_k)
