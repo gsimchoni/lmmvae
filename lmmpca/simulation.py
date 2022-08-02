@@ -36,11 +36,11 @@ def iterate_pca_types(counter, res_df, out_file, pca_in, pca_types, verbose):
 
 
 def run_reg_pca(pca_in, pca_type):
-    return reg_pca(pca_in.X_train, pca_in.X_test, pca_in.y_train,
-                   pca_in.y_test, pca_in.x_cols, pca_in.RE_cols_prefix, pca_in.d, pca_type,
-                   pca_in.thresh, pca_in.epochs, pca_in.qs, pca_in.q_spatial, pca_in.n_sig2bs_spatial, pca_in.batch_size,
-                   pca_in.patience, pca_in.n_neurons, pca_in.dropout, pca_in.activation,
-                   pca_in.mode, pca_in.beta, pca_in.re_prior, pca_in.kernel, pca_in.verbose, pca_in.U, pca_in.B_list)
+    return reg_pca(pca_in.X_train, pca_in.X_test, pca_in.x_cols,
+                pca_in.RE_cols_prefix, pca_in.d, pca_type, pca_in.thresh,
+                pca_in.epochs, pca_in.qs, pca_in.q_spatial, pca_in.n_sig2bs_spatial, pca_in.batch_size,
+                pca_in.patience, pca_in.n_neurons, pca_in.dropout, pca_in.activation,
+                pca_in.mode, pca_in.beta, pca_in.re_prior, pca_in.kernel, pca_in.verbose, pca_in.U, pca_in.B_list)
 
 
 def summarize_sim(pca_in, res, pca_type):
@@ -50,7 +50,7 @@ def summarize_sim(pca_in, res, pca_type):
         q_spatial = []
     res = [pca_in.mode, pca_in.N, pca_in.p, pca_in.d, pca_in.sig2e, pca_in.beta, pca_in.re_prior] + \
         list(pca_in.qs) + q_spatial + list(pca_in.sig2bs_means) + list(pca_in.sig2bs_spatial) + \
-        [pca_in.sig2bs_identical, pca_in.thresh, pca_in.k, pca_type, res.metric_y,
+        [pca_in.sig2bs_identical, pca_in.thresh, pca_in.k, pca_type,
         res.metric_X, res.sigmas[0]] + res.sigmas[1] + res.sigmas[2] + [res.n_epochs, res.time]
     return res
 
@@ -66,7 +66,7 @@ def simulation(out_file, params):
     q_spatial_list = [None]
     if mode == 'categorical':
         assert n_sig2bs == n_categoricals
-    elif mode in ['spatial', 'spatial_fit_categorical']:
+    elif mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
         assert n_categoricals == 0
         assert n_sig2bs == 0
         assert n_sig2bs_spatial == 2
@@ -84,7 +84,7 @@ def simulation(out_file, params):
     counter = Count().gen()
     res_df = pd.DataFrame(
         columns=['mode', 'N', 'p', 'd', 'sig2e', 'beta', 're_prior'] + qs_names + q_spatial_name + sig2bs_names + sig2bs_spatial_names + ['sig2bs_identical', 'thresh'] +
-        ['experiment', 'exp_type', 'mse_y', 'mse_X', 'sig2e_est'] + sig2bs_est_names + sig2bs_spatial_est_names + ['n_epochs', 'time'])
+        ['experiment', 'exp_type', 'mse_X', 'sig2e_est'] + sig2bs_est_names + sig2bs_spatial_est_names + ['n_epochs', 'time'])
     for N in params['N_list']:
         for sig2e in params['sig2e_list']:
             for qs in product(*params['q_list']):

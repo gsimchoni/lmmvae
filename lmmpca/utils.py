@@ -7,10 +7,10 @@ from sklearn.model_selection import train_test_split
 from scipy.spatial.distance import pdist, squareform
 
 PCAResult = namedtuple(
-    'PCAResult', ['metric_y', 'metric_X', 'sigmas', 'n_epochs', 'time'])
+    'PCAResult', ['metric_X', 'sigmas', 'n_epochs', 'time'])
 
 Data = namedtuple('PCAData', [
-    'X_train', 'X_test', 'y_train', 'y_test', 'W', 'U', 'B_list', 'x_cols', 'kernel'
+    'X_train', 'X_test', 'W', 'U', 'B_list', 'x_cols', 'kernel'
 ])
 
 PCAInput = namedtuple('PCAInput', list(Data._fields) + ['mode', 'N', 'p', 'qs', 'd',
@@ -94,7 +94,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
             Z = get_dummies(Z_idx, q)
             X += Z @ B
             Z_idx_list.append(Z_idx)
-    if mode in ['spatial', 'spatial_fit_categorical']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
         if sig2bs_spatial_mean[0] < 1:
             fs_factor = sig2bs_spatial_mean[0]
         else:
@@ -108,11 +108,24 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         # coords = coords[ind]
         dist_matrix = squareform(pdist(coords)) ** 2
         kernel = np.exp(-dist_matrix / (2 * sig2bs_spatial_mean[1]))
-        b_list = []
-        for k in range(p):
-            b_k = np.random.multivariate_normal(np.zeros(q_spatial), sig2bs_spatial[k] * kernel, 1)
-            b_list.append(b_k)
-        B = np.concatenate(b_list, axis=0).T
+        # b_list = []
+        # for k in range(p):
+        #     b_k = np.random.multivariate_normal(np.zeros(q_spatial), sig2bs_spatial[k] * kernel, 1)
+        #     b_list.append(b_k)
+        # B = np.concatenate(b_list, axis=0).T
+
+        D = np.diag(sig2bs_spatial)
+        a = np.random.normal(0, 1, q_spatial * p)
+        A = a.reshape(q_spatial, p, order='F')
+        M = np.zeros((q_spatial, p))
+        D_root = np.linalg.cholesky(D)
+        try:
+            kernel_root = np.linalg.cholesky(kernel)
+        except:
+            jitter = 1e-05
+            kernel_root = np.linalg.cholesky(kernel + jitter * np.eye(kernel.shape[0]))
+        B = M + (kernel_root @ A) @ D_root
+
         B_list = [B]
         fs = np.random.poisson(params['n_per_cat'], q_spatial) + 1
         fs_sum = fs.sum()
@@ -130,18 +143,13 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     df.columns = x_cols
     for k, Z_idx in enumerate(Z_idx_list):
         df['z' + str(k)] = Z_idx
-    if mode in ['spatial', 'spatial_fit_categorical']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
         df = pd.concat([df, coords_df], axis=1)
         x_cols.extend(co_cols)
-    y = U @ np.ones(d) + np.random.normal(size=n, scale=1.0)
-    df['y'] = y
     test_size = params.get('test_size', 0.2)
-    X_train, X_test,  y_train, y_test = train_test_split(
-        df.drop('y', axis=1), df['y'], test_size=test_size)
+    X_train, X_test = train_test_split(df, test_size=test_size)
     # TODO: why is this necessary?
     X_train.sort_index(inplace=True)
     X_test.sort_index(inplace=True)
-    y_train = y_train[X_train.index]
-    y_test = y_test[X_test.index]
     U_train = U[X_train.index]
-    return Data(X_train, X_test, y_train, y_test, W, U_train, B_list, x_cols, kernel)
+    return Data(X_train, X_test, W, U_train, B_list, x_cols, kernel_root)
