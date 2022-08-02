@@ -263,13 +263,9 @@ class LMMVAE:
 
         # encoder_outputs = self.variational_encoder([X_input] + Z_inputs)
         encoder_outputs = self.variational_encoder([X_input])
-        if mode != 'spatialX':
-            codings = encoder_outputs[0]
-            re_codings_list = encoder_outputs[1:]
-            reconstructions = self.variational_decoder([codings] + re_codings_list + Z_inputs)
-        else:
-            codings = encoder_outputs
-            reconstructions = self.variational_decoder([codings] + Z_inputs)
+        codings = encoder_outputs[0]
+        re_codings_list = encoder_outputs[1:]
+        reconstructions = self.variational_decoder([codings] + re_codings_list + Z_inputs)
         self.variational_ae = Model(inputs=[X_input] + Z_inputs, outputs=[reconstructions])
 
 
