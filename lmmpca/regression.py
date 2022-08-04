@@ -102,27 +102,28 @@ def reg_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs_spati
 
 
 def reg_pca(X_train, X_test, x_cols, RE_cols_prefix, d, pca_type,
-            thresh, epochs, qs, q_spatial, n_sig2bs_spatial, batch_size, patience, n_neurons, dropout,
+            thresh, epochs, qs, q_spatial, n_sig2bs, n_sig2bs_spatial,
+            est_cors, batch_size, patience, n_neurons, dropout,
             activation, mode, beta, re_prior, kernel, verbose, U, B_list):
     gc.collect()
     start = time.time()
     if pca_type == 'pca-ignore':
         X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
-            X_train, X_test, x_cols, RE_cols_prefix, d, len(qs), n_sig2bs_spatial, verbose, ignore_RE=True)
+            X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, verbose, ignore_RE=True)
     elif pca_type == 'pca-ohe':
         X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
-            X_train, X_test, x_cols, RE_cols_prefix, d, len(qs), n_sig2bs_spatial, verbose)
+            X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, verbose)
     elif pca_type == 'lmmpca':
         sigmas, n_epochs = reg_lmmpca(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, thresh, epochs, qs[0])
     elif pca_type == 'vae-ignore':
         X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
-            epochs, patience, n_neurons, dropout, activation, len(qs), beta, verbose, ignore_RE=True)
+            epochs, patience, n_neurons, dropout, activation, n_sig2bs, beta, verbose, ignore_RE=True)
     elif pca_type == 'vae-ohe':
         X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
-            epochs, patience, n_neurons, dropout, activation, len(qs), beta, verbose, ignore_RE=False)
+            epochs, patience, n_neurons, dropout, activation, n_sig2bs, beta, verbose, ignore_RE=False)
     elif pca_type == 'lmmvae':
         X_reconstructed_te, sigmas, n_epochs = reg_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs_spatial, x_cols, re_prior, batch_size,
@@ -140,4 +141,5 @@ def reg_pca(X_train, X_test, x_cols, RE_cols_prefix, d, pca_type,
         metric_X = mse(X_test[x_cols].values, X_reconstructed_te[:, :len(x_cols)])
     except:
         metric_X = np.nan
-    return PCAResult(metric_X, sigmas, n_epochs, end - start)
+    none_rhos = [None for _ in range(len(est_cors))]
+    return PCAResult(metric_X, sigmas, none_rhos, n_epochs, end - start)

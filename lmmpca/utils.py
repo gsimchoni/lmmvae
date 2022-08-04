@@ -7,18 +7,19 @@ from sklearn.model_selection import train_test_split
 from scipy.spatial.distance import pdist, squareform
 
 PCAResult = namedtuple(
-    'PCAResult', ['metric_X', 'sigmas', 'n_epochs', 'time'])
+    'PCAResult', ['metric_X', 'sigmas', 'rhos', 'n_epochs', 'time'])
 
 Data = namedtuple('PCAData', [
     'X_train', 'X_test', 'W', 'U', 'B_list', 'x_cols', 'kernel'
 ])
 
-PCAInput = namedtuple('PCAInput', list(Data._fields) + ['mode', 'N', 'p', 'qs', 'd',
-                                                        'sig2e', 'sig2bs_means', 'sig2bs_spatial', 'q_spatial',
-                                                        'sig2bs_identical', 'beta', 're_prior',
-                                                        'k', 'n_sig2bs_spatial', 'epochs', 'RE_cols_prefix',
-                                                        'thresh', 'batch_size', 'patience', 'n_neurons', 'dropout',
-                                                        'activation', 'verbose'])
+PCAInput = namedtuple('PCAInput',
+    list(Data._fields) + ['mode', 'N', 'p', 'qs', 'd',
+    'sig2e', 'sig2bs_means', 'sig2bs_spatial', 'q_spatial',
+    'rhos', 'sig2bs_identical', 'beta', 're_prior',
+    'k', 'n_sig2bs', 'n_sig2bs_spatial', 'estimated_cors', 'epochs', 'RE_cols_prefix',
+    'thresh', 'batch_size', 'patience', 'n_neurons', 'dropout',
+    'activation', 'verbose'])
 
 
 def get_dummies(vec, vec_max):
@@ -57,7 +58,7 @@ def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix):
     return X_train_new, X_test_new
 
 
-def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial_mean, sig2bs_identical, params):
+def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial_mean, rhos, sig2bs_identical, params):
     p = params['n_fixed_features']
     W = np.random.normal(size=p * d).reshape(p, d)
     U = np.random.normal(size=n * d).reshape(n, d)
@@ -70,7 +71,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     else:
         fU = UW
     X = fU + mu + e
-    if mode == 'categorical':
+    if mode in ['categorical', 'longitudinal']:
         Z_idx_list = []
         B_list = []
         for k, q in enumerate(qs):
