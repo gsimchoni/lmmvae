@@ -1,31 +1,26 @@
-mode: 'categorical'
+mode: 'spatial2'
 sig2e_list:
   - 1.0
 sig2bs_identical_list:
   - False
-sig2bs_mean_list:
+sig2bs_mean_list: []
+sig2b_spatial_list:
   -
-    - 0.1
-    - 1
-    - 10
+    - 1.0
+    - 10.0
   -
-    - 0.1
-    - 1
-    - 10
-sig2b_spatial_list: []
-q_list:
-  -
-    - 100
-    - 1000
-    - 10000
-  -
-    - 100
-    - 1000
-    - 10000
-q_spatial_list: []
+    - 1.0
+    - 100.0
+q_list: []
+q_spatial_list:
+  - 100
+  - 1000
+  - 10000
 latent_dimension_list:
   - 1
   - 2
+beta_list:
+  - 0.001
 N_list:
   - 100000
 n_iter: 3
@@ -39,7 +34,7 @@ dropout:
 activation: 'relu'
 X_non_linear: True
 Z_non_linear: False
-batch_size: 100
+batch_size: 1000
 epochs: 1000
 patience: 10
 verbose: False
@@ -53,3 +48,4 @@ pca_types:
   - 'vae-ohe'
   - 'vae-ignore'
   - 'lmmvae'
+  - 'lmmvae-sfc'
