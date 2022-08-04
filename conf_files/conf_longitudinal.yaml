@@ -25,7 +25,6 @@ rho_list:
 sig2b_spatial_list: []
 q_list:
   -
-    - 100
     - 1000
     - 10000
 q_spatial_list: []
@@ -53,6 +52,7 @@ log_params: False
 test_size: 0.2
 thresh: 0.0001
 RE_cols_prefix: 'z'
+longitudinal_predict_future: True
 pca_types:
   - 'pca-ignore'
   - 'pca-ohe'

@@ -58,6 +58,22 @@ def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix):
     return X_train_new, X_test_new
 
 
+def get_cov_mat(sig2bs, rhos, est_cors):
+    cov_mat = np.zeros((len(sig2bs), len(sig2bs)))
+    for k in range(len(sig2bs)):
+        for j in range(len(sig2bs)):
+            if k == j:
+                cov_mat[k, j] = sig2bs[k]
+            else:
+                rho_symbol = ''.join(map(str, sorted([k, j])))
+                if rho_symbol in est_cors:
+                    rho = rhos[est_cors.index(rho_symbol)]
+                else:
+                    rho = 0
+                cov_mat[k, j] = rho * np.sqrt(sig2bs[k]) * np.sqrt(sig2bs[j])
+    return cov_mat
+
+
 def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial_mean, rhos, sig2bs_identical, params):
     p = params['n_fixed_features']
     W = np.random.normal(size=p * d).reshape(p, d)
@@ -71,7 +87,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     else:
         fU = UW
     X = fU + mu + e
-    if mode in ['categorical', 'longitudinal']:
+    if mode == 'categorical':
         Z_idx_list = []
         B_list = []
         for k, q in enumerate(qs):
@@ -95,7 +111,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
             Z = get_dummies(Z_idx, q)
             X += Z @ B
             Z_idx_list.append(Z_idx)
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+    elif mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
         if sig2bs_spatial_mean[0] < 1:
             fs_factor = sig2bs_spatial_mean[0]
         else:
@@ -126,7 +142,6 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
             jitter = 1e-05
             kernel_root = np.linalg.cholesky(kernel + jitter * np.eye(kernel.shape[0]))
         B = M + (kernel_root @ A) @ D_root
-
         B_list = [B]
         fs = np.random.poisson(params['n_per_cat'], q_spatial) + 1
         fs_sum = fs.sum()
@@ -139,6 +154,54 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         coords_df = pd.DataFrame(coords[Z_idx])
         co_cols = ['D1', 'D2']
         coords_df.columns = co_cols
+    elif mode == 'longitudinal':
+        B_list = []
+        fs = np.random.poisson(params['n_per_cat'], qs[0]) + 1
+        fs_sum = fs.sum()
+        ps = fs/fs_sum
+        ns = np.random.multinomial(n, ps)
+        Z_idx = np.repeat(range(qs[0]), ns)
+        Z_idx_list = [Z_idx]
+        max_period = np.arange(ns.max())
+        t = np.concatenate([max_period[:k] for k in ns]) / max_period[-1]
+        estimated_cors = params.get('estimated_cors', [])
+        cov_mat = get_cov_mat(sig2bs_means, rhos, estimated_cors)
+        # if sig2bs_mean < 1:
+        #     fs_factor = sig2bs_mean
+        # else:
+        #     fs_factor = 1
+        # if sig2bs_identical:
+        #     sig2bs = np.repeat(sig2bs_mean, p)
+        # else:
+        #     sig2bs = (np.random.poisson(sig2bs_mean, p) + 1) * fs_factor
+        K = len(sig2bs_means)
+        D = np.diag(np.ones(p))
+        a = np.random.normal(0, 1, K * qs[0] * p)
+        A = a.reshape(K * qs[0], p, order='F')
+        M = np.zeros((K * qs[0], p))
+        D_root = np.linalg.cholesky(D)
+        try:
+            kernel_root = np.linalg.cholesky(np.kron(cov_mat, np.eye(qs[0])))
+        except:
+            jitter = 1e-05
+            kernel_root = np.linalg.cholesky(kernel + jitter * np.eye(kernel.shape[0]))
+        B = M + (kernel_root @ A) @ D_root
+
+        # options
+        # B = np.random.multivariate_normal(np.zeros(len(sig2bs_means) * qs[0]), np.kron(cov_mat, np.eye(qs[0])), p)
+        # b_list = []
+        # for i in range(p):
+        #     bs = np.random.multivariate_normal(np.zeros(K), cov_mat, qs[0])
+        #     b = bs.reshape((K * qs[0], 1), order = 'F')
+        #     b_list.append(b)
+        # B = np.hstack(b_list)
+
+        Z0 = sparse.csr_matrix(get_dummies(Z_idx, qs[0]))
+        Z_list = [Z0]
+        for k in range(1, K):
+            Z_list.append(sparse.spdiags(t ** k, 0, n, n) @ Z0)
+        ZB = sparse.hstack(Z_list) @ B
+        X += ZB
     df = pd.DataFrame(X)
     x_cols = ['X' + str(i) for i in range(p)]
     df.columns = x_cols
@@ -147,8 +210,17 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
         df = pd.concat([df, coords_df], axis=1)
         x_cols.extend(co_cols)
+    if mode == 'longitudinal':
+        df['t'] = t
+        x_cols.append('t')
+        pred_future = params.get('longitudinal_predict_future', False)
+    else:
+        pred_future = False
     test_size = params.get('test_size', 0.2)
-    X_train, X_test = train_test_split(df, test_size=test_size)
+    if  pred_future:
+        # test set is "the future" or those obs with largest t
+        df.sort_values('t', inplace=True)
+    X_train, X_test = train_test_split(df, test_size=test_size, shuffle=not pred_future)
     # TODO: why is this necessary?
     X_train.sort_index(inplace=True)
     X_test.sort_index(inplace=True)
