@@ -48,8 +48,8 @@ test_size: 0.2
 thresh: 0.0001
 RE_cols_prefix: 'z'
 pca_types:
-  - 'ignore'
-  - 'ohe'
-  - 'vae'
+  - 'pca-ignore'
+  - 'pca-ohe'
+  - 'vae-ohe'
   - 'vae-ignore'
   - 'lmmvae'

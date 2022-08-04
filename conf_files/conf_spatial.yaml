@@ -15,13 +15,14 @@ q_list: []
 q_spatial_list:
   - 100
   - 1000
+  - 10000
 latent_dimension_list:
   - 1
   - 2
 beta_list:
   - 0.001
 N_list:
-  - 10000
+  - 100000
 n_iter: 3
 n_per_cat: 3
 fixed_intercept: 1
@@ -43,5 +44,8 @@ thresh: 0.0001
 RE_cols_prefix: 'z'
 pca_types:
   - 'pca-ignore'
+  - 'pca-ohe'
+  - 'vae-ohe'
+  - 'vae-ignore'
   - 'lmmvae'
   - 'lmmvae-sfc'

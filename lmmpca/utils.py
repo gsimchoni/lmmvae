@@ -64,7 +64,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     mu = np.random.uniform(-10, 10, size=p)#np.zeros(p)
     e = np.random.normal(scale=np.sqrt(sig2e), size=n * p).reshape(n, p)
     UW = U @ W.T
-    kernel = None
+    kernel_root = None
     if params['X_non_linear']:
         fU = (U[:,None,:]*W[None,:,:]*np.cos(U[:,None,:]*W[None,:,:])).sum(axis=2)
     else:
