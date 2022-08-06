@@ -29,8 +29,11 @@ def get_dummies(vec, vec_max):
     return Z
 
 
-def get_columns_by_prefix(df, prefix):
-    return df.columns[df.columns.str.startswith(prefix)]
+def get_columns_by_prefix(df, prefix, mode):
+    RE_cols = list(df.columns[df.columns.str.startswith(prefix)])
+    if mode == 'longitudinal':
+        RE_cols.append('t')
+    return  RE_cols
 
 
 def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix):
@@ -202,6 +205,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
             Z_list.append(sparse.spdiags(t ** k, 0, n, n) @ Z0)
         ZB = sparse.hstack(Z_list) @ B
         X += ZB
+        B_list = [B[(i * qs[0]):((i + 1) * qs[0]), :] for i in range(K)]
     df = pd.DataFrame(X)
     x_cols = ['X' + str(i) for i in range(p)]
     df.columns = x_cols

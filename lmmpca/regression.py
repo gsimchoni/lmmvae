@@ -73,12 +73,13 @@ def reg_vaepca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial,
     return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], n_epochs
 
 
-def reg_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs_spatial, x_cols, re_prior, batch_size,
+def reg_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
                epochs, patience, n_neurons, dropout, activation, mode, beta, kernel, verbose, U, B_list):
-    RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix)
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
-        x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2']]
-    lmmvae = LMMVAE(mode, X_train[x_cols].shape[1], x_cols, RE_cols, qs, q_spatial, d, re_prior, batch_size, epochs, patience, n_neurons,
+    RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix, mode)
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
+        x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2', 't']]
+    lmmvae = LMMVAE(mode, X_train[x_cols].shape[1], x_cols, RE_cols, qs, q_spatial,
+                    d, n_sig2bs, re_prior, batch_size, epochs, patience, n_neurons,
                     dropout, activation, beta, kernel, verbose)
 
     # scaler = StandardScaler(with_std=False)
@@ -126,7 +127,7 @@ def reg_pca(X_train, X_test, x_cols, RE_cols_prefix, d, pca_type,
             epochs, patience, n_neurons, dropout, activation, n_sig2bs, beta, verbose, ignore_RE=False)
     elif pca_type == 'lmmvae':
         X_reconstructed_te, sigmas, n_epochs = reg_lmmvae(
-            X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs_spatial, x_cols, re_prior, batch_size,
+            X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, beta, kernel, verbose, U, B_list)
     elif pca_type == 'lmmvae-sfc':
         X_reconstructed_te, sigmas, n_epochs = reg_lmmvae(
@@ -135,8 +136,8 @@ def reg_pca(X_train, X_test, x_cols, RE_cols_prefix, d, pca_type,
     else:
         raise ValueError(f'{pca_type} is an unknown pca_type')
     end = time.time()
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
-        x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2']]
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
+        x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2', 't']]
     try:
         metric_X = mse(X_test[x_cols].values, X_reconstructed_te[:, :len(x_cols)])
     except:
