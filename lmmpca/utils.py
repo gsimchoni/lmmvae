@@ -226,7 +226,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         df.sort_values('t', inplace=True)
     X_train, X_test = train_test_split(df, test_size=test_size, shuffle=not pred_future)
     # TODO: why is this necessary?
-    X_train.sort_index(inplace=True)
-    X_test.sort_index(inplace=True)
+    X_train = X_train.sort_index()
+    X_test = X_test.sort_index()
     U_train = U[X_train.index]
     return Data(X_train, X_test, W, U_train, B_list, x_cols, kernel_root)
