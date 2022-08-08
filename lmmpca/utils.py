@@ -36,8 +36,8 @@ def get_columns_by_prefix(df, prefix, mode):
     return  RE_cols
 
 
-def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix):
-    RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix)
+def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix, mode):
+    RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix, mode)
     X_train_new = X_train[x_cols]
     X_test_new = X_test[x_cols]
     for RE_col in RE_cols:
@@ -166,7 +166,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         Z_idx = np.repeat(range(qs[0]), ns)
         Z_idx_list = [Z_idx]
         max_period = np.arange(ns.max())
-        t = np.concatenate([max_period[:k] for k in ns]) / max_period[-1]
+        t = 6 * sig2e * np.concatenate([max_period[:k] for k in ns]) / max_period[-1] - sig2e * 3
         estimated_cors = params.get('estimated_cors', [])
         cov_mat = get_cov_mat(sig2bs_means, rhos, estimated_cors)
         # if sig2bs_mean < 1:
@@ -221,7 +221,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     else:
         pred_future = False
     test_size = params.get('test_size', 0.2)
-    if  pred_future:
+    if pred_future:
         # test set is "the future" or those obs with largest t
         df.sort_values('t', inplace=True)
     X_train, X_test = train_test_split(df, test_size=test_size, shuffle=not pred_future)

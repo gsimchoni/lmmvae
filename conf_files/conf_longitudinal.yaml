@@ -17,6 +17,8 @@ sig2bs_mean_list:
 estimated_cors:
   - '01'
   - '02'
+beta_list:
+  - 0.001
 rho_list:
   -
     - 0.3
@@ -25,8 +27,8 @@ rho_list:
 sig2b_spatial_list: []
 q_list:
   -
+    - 100
     - 1000
-    - 10000
 q_spatial_list: []
 latent_dimension_list:
   - 1
@@ -44,7 +46,7 @@ dropout:
 activation: 'relu'
 X_non_linear: True
 Z_non_linear: False
-batch_size: 100
+batch_size: 1000
 epochs: 1000
 patience: 10
 verbose: False
@@ -52,10 +54,10 @@ log_params: False
 test_size: 0.2
 thresh: 0.0001
 RE_cols_prefix: 'z'
-longitudinal_predict_future: True
+longitudinal_predict_future: False
 pca_types:
   - 'pca-ignore'
   - 'pca-ohe'
-  - 'vae-ohe'
   - 'vae-ignore'
+  - 'vae-ohe'
   - 'lmmvae'

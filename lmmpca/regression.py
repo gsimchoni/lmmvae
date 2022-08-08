@@ -13,12 +13,12 @@ from lmmpca.vaepca import LMMVAE, VAE
 
 
 def reg_pca_ohe_or_ignore(X_train, X_test, x_cols,
-    RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, verbose, ignore_RE=False):
+    RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose, ignore_RE=False):
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
     else:
         X_train, X_test = process_one_hot_encoding(
-            X_train, X_test, x_cols, RE_cols_prefix)
+            X_train, X_test, x_cols, RE_cols_prefix, mode)
     pca = PCA(n_components=d)
 
     scaler = StandardScaler()
@@ -50,12 +50,12 @@ def reg_lmmpca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, to
 
 def reg_vaepca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial,
                x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
-               n_sig2bs, beta, verbose, ignore_RE=False):
+               mode, n_sig2bs, beta, verbose, ignore_RE=False):
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
     else:
         X_train, X_test = process_one_hot_encoding(
-            X_train, X_test, x_cols, RE_cols_prefix)
+            X_train, X_test, x_cols, RE_cols_prefix, mode)
     vae = VAE(X_train.shape[1], d, batch_size, epochs, patience, n_neurons,
               dropout, activation, beta, verbose)
 
@@ -110,21 +110,21 @@ def reg_pca(X_train, X_test, x_cols, RE_cols_prefix, d, pca_type,
     start = time.time()
     if pca_type == 'pca-ignore':
         X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
-            X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, verbose, ignore_RE=True)
+            X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose, ignore_RE=True)
     elif pca_type == 'pca-ohe':
         X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
-            X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, verbose)
+            X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose)
     elif pca_type == 'lmmpca':
         sigmas, n_epochs = reg_lmmpca(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, thresh, epochs, qs[0])
     elif pca_type == 'vae-ignore':
         X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
-            epochs, patience, n_neurons, dropout, activation, n_sig2bs, beta, verbose, ignore_RE=True)
+            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, verbose, ignore_RE=True)
     elif pca_type == 'vae-ohe':
         X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
-            epochs, patience, n_neurons, dropout, activation, n_sig2bs, beta, verbose, ignore_RE=False)
+            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, verbose, ignore_RE=False)
     elif pca_type == 'lmmvae':
         X_reconstructed_te, sigmas, n_epochs = reg_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,

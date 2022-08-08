@@ -1,4 +1,5 @@
 mode: 'categorical'
+rho_list: []
 sig2e_list:
   - 1.0
 sig2bs_identical_list:
