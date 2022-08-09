@@ -3,7 +3,7 @@
 import argparse
 import yaml
 import logging
-from lmmpca.simulation import simulation
+from lmmvae.simulation import simulation
 
 
 def parse():

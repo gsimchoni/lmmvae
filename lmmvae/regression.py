@@ -7,9 +7,9 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error as mse
 from sklearn.preprocessing import StandardScaler
 
-from lmmpca.pca import LMMPCA
-from lmmpca.utils import PCAResult, get_columns_by_prefix, process_one_hot_encoding
-from lmmpca.vaepca import LMMVAE, VAE
+from lmmvae.pca import LMMPCA
+from lmmvae.utils import PCAResult, get_columns_by_prefix, process_one_hot_encoding
+from lmmvae.vae import LMMVAE, VAE
 
 
 def reg_pca_ohe_or_ignore(X_train, X_test, x_cols,

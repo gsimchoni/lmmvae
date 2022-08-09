@@ -6,7 +6,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.decomposition import PCA
 from sklearn.utils.validation import check_is_fitted
 
-from lmmpca.utils import get_dummies
+from lmmvae.utils import get_dummies
 
 
 class LMMPCA(BaseEstimator, TransformerMixin):

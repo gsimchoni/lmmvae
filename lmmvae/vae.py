@@ -14,7 +14,7 @@ from tensorflow.keras.losses import MeanSquaredError
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import Regularizer
 
-from lmmpca.utils import get_dummies
+from lmmvae.utils import get_dummies
 
 
 class Sampling(Layer):

@@ -4,8 +4,8 @@ from itertools import product
 
 import pandas as pd
 
-from lmmpca.regression import reg_pca
-from lmmpca.utils import PCAInput, generate_data
+from lmmvae.regression import reg_pca
+from lmmvae.utils import PCAInput, generate_data
 
 logger = logging.getLogger('LMMPCA.logger')
 os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
