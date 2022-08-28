@@ -43,10 +43,10 @@ def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix, mode):
     for RE_col in RE_cols:
         X_train_ohe = pd.get_dummies(X_train[RE_col])
         X_test_ohe = pd.get_dummies(X_test[RE_col])
-        X_test_cols_in_train = set(
-            X_test_ohe.columns).intersection(X_train_ohe.columns)
-        X_train_cols_not_in_test = set(
-            X_train_ohe.columns).difference(X_test_ohe.columns)
+        X_test_cols_in_train = list(set(
+            X_test_ohe.columns).intersection(X_train_ohe.columns))
+        X_train_cols_not_in_test = list(set(
+            X_train_ohe.columns).difference(X_test_ohe.columns))
         X_test_comp = pd.DataFrame(np.zeros((X_test.shape[0], len(X_train_cols_not_in_test))),
                                    columns=X_train_cols_not_in_test, dtype=np.uint8, index=X_test.index)
         X_test_ohe_comp = pd.concat(
