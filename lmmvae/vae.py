@@ -146,7 +146,7 @@ class LMMVAE:
     """
 
     def __init__(self, mode, p, x_cols, RE_cols, qs, q_spatial, d, n_sig2bs,
-                re_prior, batch_size, epochs, patience, n_neurons,
+                re_prior, batch_size, epochs, patience, n_neurons, n_neurons_re,
                 dropout, activation, beta, kernel_root, verbose) -> None:
         super().__init__()
         K.clear_session()
@@ -195,7 +195,7 @@ class LMMVAE:
         # codings_mean = Dense(d, kernel_regularizer=Orthogonal(d))(z1)
         codings_mean = Dense(d)(z1)
         codings_log_var = Dense(d)(z1)
-        z2 = add_layers_functional(X_input, n_neurons, dropout, activation, p)
+        z2 = add_layers_functional(X_input, n_neurons_re, dropout, activation, p)
         if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
             re_codings_mean_list = []
             re_codings_log_var_list = []

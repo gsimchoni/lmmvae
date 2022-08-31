@@ -18,7 +18,7 @@ PCAInput = namedtuple('PCAInput',
     'sig2e', 'sig2bs_means', 'sig2bs_spatial', 'q_spatial',
     'rhos', 'sig2bs_identical', 'beta', 're_prior',
     'k', 'n_sig2bs', 'n_sig2bs_spatial', 'estimated_cors', 'epochs', 'RE_cols_prefix',
-    'thresh', 'batch_size', 'patience', 'n_neurons', 'dropout',
+    'thresh', 'batch_size', 'patience', 'n_neurons', 'n_neurons_re', 'dropout',
     'activation', 'verbose'])
 
 
