@@ -6,14 +6,14 @@ import scipy.sparse as sparse
 from sklearn.model_selection import train_test_split
 from scipy.spatial.distance import pdist, squareform
 
-PCAResult = namedtuple(
+DRResult = namedtuple(
     'PCAResult', ['metric_X', 'sigmas', 'rhos', 'n_epochs', 'time'])
 
 Data = namedtuple('PCAData', [
     'X_train', 'X_test', 'W', 'U', 'B_list', 'x_cols', 'kernel'
 ])
 
-PCAInput = namedtuple('PCAInput',
+DRInput = namedtuple('PCAInput',
     list(Data._fields) + ['mode', 'N', 'p', 'qs', 'd',
     'sig2e', 'sig2bs_means', 'sig2bs_spatial', 'q_spatial',
     'rhos', 'sig2bs_identical', 'beta', 're_prior',

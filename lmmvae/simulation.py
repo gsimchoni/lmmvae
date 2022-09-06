@@ -4,10 +4,10 @@ from itertools import product
 
 import pandas as pd
 
-from lmmvae.regression import reg_pca
-from lmmvae.utils import PCAInput, generate_data
+from lmmvae.regression import reg_dr
+from lmmvae.utils import DRInput, generate_data
 
-logger = logging.getLogger('LMMPCA.logger')
+logger = logging.getLogger('LMMVAE.logger')
 os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
 
 
@@ -24,34 +24,34 @@ class Count:
             yield Count.curr
 
 
-def iterate_pca_types(counter, res_df, out_file, pca_in, pca_types, verbose):
-    for pca_type in pca_types:
+def iterate_dr_types(counter, res_df, out_file, dr_in, dr_types, verbose):
+    for dr_type in dr_types:
         if verbose:
-            logger.info(f'mode {pca_type}')
-        res = run_reg_pca(pca_in, pca_type)
-        res_summary = summarize_sim(pca_in, res, pca_type)
+            logger.info(f'mode {dr_type}')
+        res = run_dr(dr_in, dr_type)
+        res_summary = summarize_sim(dr_in, res, dr_type)
         res_df.loc[next(counter)] = res_summary
-        logger.debug(f'  Finished {pca_type}.')
+        logger.debug(f'  Finished {dr_type}.')
     res_df.to_csv(out_file)
 
 
-def run_reg_pca(pca_in, pca_type):
-    return reg_pca(pca_in.X_train, pca_in.X_test, pca_in.x_cols,
-                pca_in.RE_cols_prefix, pca_in.d, pca_type, pca_in.thresh,
-                pca_in.epochs, pca_in.qs, pca_in.q_spatial, pca_in.n_sig2bs,
-                pca_in.n_sig2bs_spatial, pca_in.estimated_cors, pca_in.batch_size,
-                pca_in.patience, pca_in.n_neurons, pca_in.n_neurons_re, pca_in.dropout, pca_in.activation,
-                pca_in.mode, pca_in.beta, pca_in.re_prior, pca_in.kernel, pca_in.verbose, pca_in.U, pca_in.B_list)
+def run_dr(dr_in, dr_type):
+    return reg_dr(dr_in.X_train, dr_in.X_test, dr_in.x_cols,
+                dr_in.RE_cols_prefix, dr_in.d, dr_type, dr_in.thresh,
+                dr_in.epochs, dr_in.qs, dr_in.q_spatial, dr_in.n_sig2bs,
+                dr_in.n_sig2bs_spatial, dr_in.estimated_cors, dr_in.batch_size,
+                dr_in.patience, dr_in.n_neurons, dr_in.n_neurons_re, dr_in.dropout, dr_in.activation,
+                dr_in.mode, dr_in.beta, dr_in.re_prior, dr_in.kernel, dr_in.verbose, dr_in.U, dr_in.B_list)
 
 
-def summarize_sim(pca_in, res, pca_type):
-    if pca_in.q_spatial is not None:
-        q_spatial = [pca_in.q_spatial]
+def summarize_sim(dr_in, res, dr_type):
+    if dr_in.q_spatial is not None:
+        q_spatial = [dr_in.q_spatial]
     else:
         q_spatial = []
-    res = [pca_in.mode, pca_in.N, pca_in.p, pca_in.d, pca_in.sig2e, pca_in.beta, pca_in.re_prior] + \
-        list(pca_in.qs) + q_spatial + list(pca_in.sig2bs_means) + list(pca_in.sig2bs_spatial) + list(pca_in.rhos) + \
-        [pca_in.sig2bs_identical, pca_in.thresh, pca_in.k, pca_type,
+    res = [dr_in.mode, dr_in.N, dr_in.p, dr_in.d, dr_in.sig2e, dr_in.beta, dr_in.re_prior] + \
+        list(dr_in.qs) + q_spatial + list(dr_in.sig2bs_means) + list(dr_in.sig2bs_spatial) + list(dr_in.rhos) + \
+        [dr_in.sig2bs_identical, dr_in.thresh, dr_in.k, dr_type,
         res.metric_X, res.sigmas[0]] + res.sigmas[1] + res.sigmas[2] + res.rhos + [res.n_epochs, res.time]
     return res
 
@@ -115,10 +115,10 @@ def simulation(out_file, params):
                                                         f'rhos: {", ".join(map(str, rhos))}, '
                                                         f'sig2bs_identical: {sig2bs_identical}, beta: {beta}')
                                             for k in range(params['n_iter']):
-                                                pca_data = generate_data(mode, N, qs, q_spatial, latent_dimension,
+                                                dr_data = generate_data(mode, N, qs, q_spatial, latent_dimension,
                                                                         sig2e, sig2bs_means, sig2bs_spatial, rhos, sig2bs_identical, params)
                                                 logger.info(' iteration: %d' % k)
-                                                pca_in = PCAInput(*pca_data, mode, N, params['n_fixed_features'],
+                                                dr_in = DRInput(*dr_data, mode, N, params['n_fixed_features'],
                                                                 qs, latent_dimension,
                                                                 sig2e, sig2bs_means, sig2bs_spatial, q_spatial, rhos, sig2bs_identical,
                                                                 beta, re_prior, k, n_sig2bs,
@@ -128,5 +128,5 @@ def simulation(out_file, params):
                                                                 params['patience'],
                                                                 params['n_neurons'], n_neurons_re, params['dropout'],
                                                                 params['activation'], params['verbose'])
-                                                iterate_pca_types(counter, res_df, out_file,
-                                                                pca_in, params['pca_types'], params['verbose'])
+                                                iterate_dr_types(counter, res_df, out_file,
+                                                                dr_in, params['dr_types'], params['verbose'])

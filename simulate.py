@@ -22,10 +22,10 @@ def load_yaml(conf_file):
 
 
 def get_logger():
-    logger = logging.getLogger('LMMPCA.logger')
+    logger = logging.getLogger('LMMVAE.logger')
     logger.setLevel(logging.DEBUG)
     c_handler = logging.StreamHandler()
-    f_handler = logging.FileHandler('lmmpca_sim.log')
+    f_handler = logging.FileHandler('lmmvae_sim.log')
     c_handler.setLevel(logging.INFO)
     f_handler.setLevel(logging.DEBUG)
     c_format = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
@@ -40,7 +40,7 @@ def get_logger():
 
 def main():
     logger = get_logger()
-    logger.info('Started LMMPCA simulation.')
+    logger.info('Started LMMVAE simulation.')
     args = parse()
     params = load_yaml(args.conf)
     simulation(args.out, params)

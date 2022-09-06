@@ -43,7 +43,7 @@ log_params: False
 test_size: 0.2
 thresh: 0.0001
 RE_cols_prefix: 'z'
-pca_types:
+dr_types:
   - 'pca-ignore'
   - 'pca-ohe'
   - 'vae-ohe'

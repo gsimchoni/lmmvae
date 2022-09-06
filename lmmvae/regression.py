@@ -8,11 +8,11 @@ from sklearn.metrics import mean_squared_error as mse
 from sklearn.preprocessing import StandardScaler
 
 from lmmvae.pca import LMMPCA
-from lmmvae.utils import PCAResult, get_columns_by_prefix, process_one_hot_encoding
+from lmmvae.utils import DRResult, get_columns_by_prefix, process_one_hot_encoding
 from lmmvae.vae import LMMVAE, VAE
 
 
-def reg_pca_ohe_or_ignore(X_train, X_test, x_cols,
+def run_pca_ohe_or_ignore(X_train, X_test, x_cols,
     RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose, ignore_RE=False):
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
@@ -35,7 +35,7 @@ def reg_pca_ohe_or_ignore(X_train, X_test, x_cols,
     return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], None
 
 
-def reg_lmmpca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, tolerance, max_it, cardinality):
+def run_lmmpca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, tolerance, max_it, cardinality):
     pca = LMMPCA(n_components=d, max_it=max_it, tolerance=tolerance,
                  cardinality=cardinality, verbose=verbose)
     RE_col = get_columns_by_prefix(X_train, RE_cols_prefix)[0]
@@ -48,7 +48,7 @@ def reg_lmmpca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, to
     return X_reconstructed_te, [pca.sig2e_est, [sig2bs_mean_est], none_sigmas_spatial], pca.n_iter
 
 
-def reg_vaepca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial,
+def run_vae(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial,
                x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
                mode, n_sig2bs, beta, verbose, ignore_RE=False):
     if ignore_RE:
@@ -73,7 +73,7 @@ def reg_vaepca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial,
     return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], n_epochs
 
 
-def reg_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
+def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
                epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, verbose, U, B_list):
     RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix, mode)
     if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
@@ -102,39 +102,39 @@ def reg_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
     return X_reconstructed_te, [None, sig2bs_mean_est, sigmas_spatial], n_epochs
 
 
-def reg_pca(X_train, X_test, x_cols, RE_cols_prefix, d, pca_type,
+def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             thresh, epochs, qs, q_spatial, n_sig2bs, n_sig2bs_spatial,
             est_cors, batch_size, patience, n_neurons, n_neurons_re, dropout,
             activation, mode, beta, re_prior, kernel, verbose, U, B_list):
     gc.collect()
     start = time.time()
-    if pca_type == 'pca-ignore':
-        X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
+    if dr_type == 'pca-ignore':
+        X_reconstructed_te, sigmas, n_epochs = run_pca_ohe_or_ignore(
             X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose, ignore_RE=True)
-    elif pca_type == 'pca-ohe':
-        X_reconstructed_te, sigmas, n_epochs = reg_pca_ohe_or_ignore(
+    elif dr_type == 'pca-ohe':
+        X_reconstructed_te, sigmas, n_epochs = run_pca_ohe_or_ignore(
             X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose)
-    elif pca_type == 'lmmpca':
-        sigmas, n_epochs = reg_lmmpca(
+    elif dr_type == 'lmmpca':
+        sigmas, n_epochs = run_lmmpca(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, thresh, epochs, qs[0])
-    elif pca_type == 'vae-ignore':
-        X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
+    elif dr_type == 'vae-ignore':
+        X_reconstructed_te, sigmas, n_epochs = run_vae(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, verbose, ignore_RE=True)
-    elif pca_type == 'vae-ohe':
-        X_reconstructed_te, sigmas, n_epochs = reg_vaepca(
+    elif dr_type == 'vae-ohe':
+        X_reconstructed_te, sigmas, n_epochs = run_vae(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, verbose, ignore_RE=False)
-    elif pca_type == 'lmmvae':
-        X_reconstructed_te, sigmas, n_epochs = reg_lmmvae(
+    elif dr_type == 'lmmvae':
+        X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, verbose, U, B_list)
-    elif pca_type == 'lmmvae-sfc':
-        X_reconstructed_te, sigmas, n_epochs = reg_lmmvae(
+    elif dr_type == 'lmmvae-sfc':
+        X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, 'spatial_fit_categorical', beta, kernel, verbose, U, B_list)
     else:
-        raise ValueError(f'{pca_type} is an unknown pca_type')
+        raise ValueError(f'{dr_type} is an unknown dr_type')
     end = time.time()
     if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
         x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2', 't']]
@@ -143,4 +143,4 @@ def reg_pca(X_train, X_test, x_cols, RE_cols_prefix, d, pca_type,
     except:
         metric_X = np.nan
     none_rhos = [None for _ in range(len(est_cors))]
-    return PCAResult(metric_X, sigmas, none_rhos, n_epochs, end - start)
+    return DRResult(metric_X, sigmas, none_rhos, n_epochs, end - start)
