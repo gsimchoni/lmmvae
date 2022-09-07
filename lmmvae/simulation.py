@@ -4,7 +4,7 @@ from itertools import product
 
 import pandas as pd
 
-from lmmvae.regression import reg_dr
+from lmmvae.regression import run_dim_reduction
 from lmmvae.utils import DRInput, generate_data
 
 logger = logging.getLogger('LMMVAE.logger')
@@ -36,7 +36,7 @@ def iterate_dr_types(counter, res_df, out_file, dr_in, dr_types, verbose):
 
 
 def run_dr(dr_in, dr_type):
-    return reg_dr(dr_in.X_train, dr_in.X_test, dr_in.x_cols,
+    return run_dim_reduction(dr_in.X_train, dr_in.X_test, dr_in.x_cols,
                 dr_in.RE_cols_prefix, dr_in.d, dr_type, dr_in.thresh,
                 dr_in.epochs, dr_in.qs, dr_in.q_spatial, dr_in.n_sig2bs,
                 dr_in.n_sig2bs_spatial, dr_in.estimated_cors, dr_in.batch_size,

@@ -23,7 +23,7 @@ latent_dimension_list:
 beta_list:
   - 0.001
 N_list:
-  - 100000
+  - 10000
 n_iter: 3
 n_per_cat: 3
 fixed_intercept: 1
@@ -35,18 +35,14 @@ dropout:
 activation: 'relu'
 X_non_linear: True
 Z_non_linear: False
-batch_size: 1000
+batch_size: 100
 epochs: 1000
 patience: 10
-verbose: False
+verbose: True
 log_params: False
 test_size: 0.2
 thresh: 0.0001
 RE_cols_prefix: 'z'
 dr_types:
   - 'pca-ignore'
-  - 'pca-ohe'
-  - 'vae-ohe'
-  - 'vae-ignore'
-  - 'lmmvae'
-  - 'lmmvae-sfc'
+  - 'gplvm'

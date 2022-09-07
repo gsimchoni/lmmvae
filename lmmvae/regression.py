@@ -1,11 +1,14 @@
 import gc
 import time
+import torch
 
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error as mse
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from lmmvae.gplvm import GPLVM
 
 from lmmvae.pca import LMMPCA
 from lmmvae.utils import DRResult, get_columns_by_prefix, process_one_hot_encoding
@@ -102,7 +105,64 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
     return X_reconstructed_te, [None, sig2bs_mean_est, sigmas_spatial], n_epochs
 
 
-def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
+def run_gplvm(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
+    epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, verbose):
+
+    X_train = X_train[x_cols]
+    X_test = X_test[x_cols]
+
+    # x_cols_mlp = [col for col in x_cols if col not in ['D1', 'D2']]
+    # x_cols_gp = ['D1', 'D2']
+
+    # X_train, X_valid = train_test_split(X_train, test_size=0.1)
+    
+    # not needed later
+    X_train = torch.Tensor(X_train.values)
+    # valid_x = torch.Tensor(X_valid.values)
+    X_test = torch.Tensor(X_test.values)
+    
+    # train_x_mlp = torch.Tensor(X_train[x_cols_mlp].values)
+    # train_x_gp = torch.Tensor(X_train[x_cols_gp].values)
+    # valid_x_mlp = torch.Tensor(X_valid[x_cols_mlp].values)
+    # valid_x_gp = torch.Tensor(X_valid[x_cols_gp].values)
+    # test_x_mlp = torch.Tensor(X_test[x_cols_mlp].values)
+    # test_x_gp = torch.Tensor(X_test[x_cols_gp].values)
+
+    # not needed later
+    if torch.cuda.is_available():
+            X_train, X_test = X_train.cuda(), X_test.cuda()
+
+    # if torch.cuda.is_available():
+    #     train_x_mlp, train_x_gp, valid_x_mlp, valid_x_gp, test_x_mlp, test_x_gp = train_x_mlp.cuda(), train_x_gp.cuda(), valid_x_mlp.cuda(), valid_x_gp.cuda(), test_x_mlp.cuda(), test_x_gp.cuda()
+
+    # train_dataset = torch.utils.data.TensorDataset(train_x_mlp, train_x_gp)
+    # train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+    # valid_dataset = torch.utils.data.TensorDataset(valid_x_mlp, valid_x_gp)
+    # valid_dataloader = torch.utils.data.DataLoader(valid_dataset, batch_size=batch_size)
+
+    # test_dataset = torch.utils.data.TensorDataset(test_x_mlp, test_x_gp)
+    # test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+    n_inducing = 500
+    gplvm = GPLVM(X_train.shape[0], X_train.shape[1], d, n_inducing, batch_size, epochs, patience, n_neurons,
+        dropout, activation, verbose)
+
+    # scaler = StandardScaler()
+    # X_train = scaler.fit_transform(X_train)
+    # X_test = scaler.transform(X_test)
+
+    X_transformed_tr = gplvm.fit_transform(X_train)
+    X_transformed_te = gplvm.transform(X_test)
+    X_reconstructed_te = gplvm.reconstruct(X_transformed_te)
+
+    n_epochs = len(gplvm.get_history())
+    none_sigmas = [None for _ in range(n_sig2bs)]
+    none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
+    return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], n_epochs
+
+
+def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             thresh, epochs, qs, q_spatial, n_sig2bs, n_sig2bs_spatial,
             est_cors, batch_size, patience, n_neurons, n_neurons_re, dropout,
             activation, mode, beta, re_prior, kernel, verbose, U, B_list):
@@ -133,6 +193,10 @@ def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
         X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, 'spatial_fit_categorical', beta, kernel, verbose, U, B_list)
+    elif dr_type == 'gplvm':
+        X_reconstructed_te, sigmas, n_epochs = run_gplvm(
+            X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
+            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, verbose)
     else:
         raise ValueError(f'{dr_type} is an unknown dr_type')
     end = time.time()
