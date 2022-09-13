@@ -6,10 +6,13 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error as mse
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 
 from lmmvae.pca import LMMPCA
 from lmmvae.utils import DRResult, get_columns_by_prefix, process_one_hot_encoding
 from lmmvae.vae import LMMVAE, VAE
+
+from SVGPVAE.TABULAR_experiment import run_experiment_SVGPVAE
 
 
 def run_pca_ohe_or_ignore(X_train, X_test, x_cols,
@@ -102,6 +105,36 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
     return X_reconstructed_te, [None, sig2bs_mean_est, sigmas_spatial], n_epochs
 
 
+def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode,
+    batch_size, epochs, patience, n_neurons, dropout, activation, verbose):
+    # split train to train and eval?
+    X_train, X_eval = train_test_split(X_train, test_size=0.05)
+
+    # get dictionaries
+    RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix, mode)
+    train_data_dict, eval_data_dict, test_data_dict = process_data_for_svgpvae(X_train, X_test, X_eval, x_cols, RE_cols)
+    
+    # run SVGPVAE
+    # L, batch_size, nr_epochs, elbo_arg
+    X_reconstructed_te = run_experiment_SVGPVAE(train_data_dict, eval_data_dict, test_data_dict,
+        d, batch_size, epochs, n_neurons, dropout, activation, elbo_arg='SVGPVAE_Hensman')
+    none_sigmas = [None for _ in range(n_sig2bs)]
+    none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
+    return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], None
+
+def process_data_for_svgpvae(X_train, X_test, X_eval, x_cols, RE_cols):
+    return get_data_dict(X_train, x_cols, RE_cols), \
+        get_data_dict(X_eval, x_cols, RE_cols), \
+        get_data_dict(X_test, x_cols, RE_cols)
+
+def get_data_dict(X, x_cols, RE_cols):
+    data_dict = {
+        'data_Y': X[x_cols],
+        'aux_X': X[x_cols + RE_cols]
+    }
+    return data_dict
+
+
 def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             thresh, epochs, qs, q_spatial, n_sig2bs, n_sig2bs_spatial,
             est_cors, batch_size, patience, n_neurons, n_neurons_re, dropout,
@@ -133,6 +166,10 @@ def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
         X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, 'spatial_fit_categorical', beta, kernel, verbose, U, B_list)
+    elif dr_type == 'svgpvae':
+        X_reconstructed_te, sigmas, n_epochs = run_svgpvae(
+            X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, batch_size,
+            epochs, patience, n_neurons, dropout, activation, verbose)
     else:
         raise ValueError(f'{dr_type} is an unknown dr_type')
     end = time.time()
