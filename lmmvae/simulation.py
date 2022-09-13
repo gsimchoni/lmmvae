@@ -4,7 +4,7 @@ from itertools import product
 
 import pandas as pd
 
-from lmmvae.regression import reg_dr
+from lmmvae.dim_reduction import reg_dr
 from lmmvae.utils import DRInput, generate_data
 
 logger = logging.getLogger('LMMVAE.logger')
