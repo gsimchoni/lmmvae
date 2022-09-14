@@ -131,7 +131,7 @@ def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig
     # run SVGPVAE
     X_reconstructed_te = run_experiment_SVGPVAE(train_data_dict, eval_data_dict, test_data_dict,
         d, q, batch_size, epochs, n_neurons, dropout, activation, elbo_arg='SVGPVAE_Hensman',
-        M = M, nr_inducing_points = nr_inducing_points, RE_cols=RE_cols)
+        M = M, nr_inducing_points = nr_inducing_points, RE_cols=RE_cols, aux_cols=aux_cols)
     none_sigmas = [None for _ in range(n_sig2bs)]
     none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
     return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], None
