@@ -106,22 +106,32 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
     return X_reconstructed_te, [None, sig2bs_mean_est, sigmas_spatial], n_epochs
 
 
-def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode,
+def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, mode,
     batch_size, epochs, patience, n_neurons, dropout, activation, verbose):
     # split train to train and eval?
     X_train, X_eval = train_test_split(X_train, test_size=0.05)
 
     # get dictionaries
     RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix, mode)
-    aux_cols = ['D1', 'D2']
+    if mode == 'categorical':
+        aux_cols = []
+        q = qs[0]
+    elif mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+        aux_cols = ['D1', 'D2']
+        q = q_spatial
+    elif mode == 'longitudinal':
+        aux_cols = ['t']
+        q = qs[0]
+    else:
+        raise ValueError(f'mode {mode} not recognized')
     M = 10
     nr_inducing_points = 64
     train_data_dict, eval_data_dict, test_data_dict = process_data_for_svgpvae(X_train, X_test, X_eval, x_cols, aux_cols, RE_cols, M)
     
     # run SVGPVAE
     X_reconstructed_te = run_experiment_SVGPVAE(train_data_dict, eval_data_dict, test_data_dict,
-        d, batch_size, epochs, n_neurons, dropout, activation, elbo_arg='SVGPVAE_Hensman',
-        M = M, nr_inducing_points = nr_inducing_points)
+        d, q, batch_size, epochs, n_neurons, dropout, activation, elbo_arg='SVGPVAE_Hensman',
+        M = M, nr_inducing_points = nr_inducing_points, RE_cols=RE_cols)
     none_sigmas = [None for _ in range(n_sig2bs)]
     none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
     return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], None
@@ -140,20 +150,20 @@ def process_data_for_svgpvae(X_train, X_test, X_eval, x_cols, aux_cols, RE_cols,
     # furthermore perform PCA on training data only! (in all SVGPVAE MNIST example the test data is a missing angle (image))
     # then eval/test should be projected
     train_data_dict, pca, scaler = process_X_for_svgpvae(X_train, x_cols, RE_cols, aux_cols, M = M)
-    eval_data_dict, _, _ = process_X_for_svgpvae(X_eval, x_cols, RE_cols, aux_cols, pca, scaler)
-    test_data_dict, _, _ = process_X_for_svgpvae(X_test, x_cols, RE_cols, aux_cols, pca, scaler)
+    eval_data_dict, _, _ = process_X_for_svgpvae(X_eval, x_cols, RE_cols, aux_cols, pca, scaler, M)
+    test_data_dict, _, _ = process_X_for_svgpvae(X_test, x_cols, RE_cols, aux_cols, pca, scaler, M)
     return train_data_dict, eval_data_dict, test_data_dict
 
 def process_X_for_svgpvae(X, x_cols, RE_cols, aux_cols, pca=None, scaler=None, M=None):
-    X_grouped = X.groupby(RE_cols).mean(x_cols)
+    X_grouped = X.groupby(RE_cols)[x_cols].mean()
     X_index = X_grouped.index
+    if M is None:
+        M = int(X.shape[1] * 0.1)
     if pca is None: # training data, perform PCA
-        if M is None:
-            M = int(X.shape[1] * 0.1)
         pca = PCA(n_components=M)
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X_grouped.drop(aux_cols, axis=1))
-        X_trans = pd.DataFrame(pca.fit_transform(X_scaled), index = X_index)
+        X_trans = pd.DataFrame(pca.fit_transform(X_scaled), index = X_index, columns=['PC' + str(i) for i in range(M)])
     else:
         X_scaled = scaler.transform(X_grouped.drop(aux_cols, axis=1))
         X_trans = pd.DataFrame(pca.transform(X_scaled), index = X_index)
@@ -198,7 +208,7 @@ def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, 'spatial_fit_categorical', beta, kernel, verbose, U, B_list)
     elif dr_type == 'svgpvae':
         X_reconstructed_te, sigmas, n_epochs = run_svgpvae(
-            X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, batch_size,
+            X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, mode, batch_size,
             epochs, patience, n_neurons, dropout, activation, verbose)
     else:
         raise ValueError(f'{dr_type} is an unknown dr_type')
