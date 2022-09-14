@@ -2,6 +2,7 @@ import gc
 import time
 
 import numpy as np
+import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error as mse
@@ -112,27 +113,56 @@ def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_s
 
     # get dictionaries
     RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix, mode)
-    train_data_dict, eval_data_dict, test_data_dict = process_data_for_svgpvae(X_train, X_test, X_eval, x_cols, RE_cols)
+    aux_cols = ['D1', 'D2']
+    M = 10
+    nr_inducing_points = 64
+    train_data_dict, eval_data_dict, test_data_dict = process_data_for_svgpvae(X_train, X_test, X_eval, x_cols, aux_cols, RE_cols, M)
     
     # run SVGPVAE
-    # L, batch_size, nr_epochs, elbo_arg
     X_reconstructed_te = run_experiment_SVGPVAE(train_data_dict, eval_data_dict, test_data_dict,
-        d, batch_size, epochs, n_neurons, dropout, activation, elbo_arg='SVGPVAE_Hensman')
+        d, batch_size, epochs, n_neurons, dropout, activation, elbo_arg='SVGPVAE_Hensman',
+        M = M, nr_inducing_points = nr_inducing_points)
     none_sigmas = [None for _ in range(n_sig2bs)]
     none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
     return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], None
 
-def process_data_for_svgpvae(X_train, X_test, X_eval, x_cols, RE_cols):
-    return get_data_dict(X_train, x_cols, RE_cols), \
-        get_data_dict(X_eval, x_cols, RE_cols), \
-        get_data_dict(X_test, x_cols, RE_cols)
+def process_data_for_svgpvae(X_train, X_test, X_eval, x_cols, aux_cols, RE_cols, M):
+    # What is objects data (on which SVGPVAE perform PCA to get more auxiliary data)?
+    # for a single categorical: data on q clusters
+    # for spatial data: data on q locations
+    # for longitudinal: data on q subjects
+    # but notice in all of SVGPVAE examples Y, an image, is predicted based on X, an image PCA-ed (+ "angle info")!
+    # in simulations we do not have features regarding q clusters/locations/subjects
+    # in real data we might
+    # but either way these should be concatenated to data *in all time/location/cluster dependent features* which comprise our X
+    # then GROUPED and AVERAGED BY subject/location/cluster, then concatenated back to "angle info", before performing PCA, 
+    # otherwise information in aux_X is missing to get good reconstructions in data_Y
+    # furthermore perform PCA on training data only! (in all SVGPVAE MNIST example the test data is a missing angle (image))
+    # then eval/test should be projected
+    train_data_dict, pca, scaler = process_X_for_svgpvae(X_train, x_cols, RE_cols, aux_cols, M = M)
+    eval_data_dict, _, _ = process_X_for_svgpvae(X_eval, x_cols, RE_cols, aux_cols, pca, scaler)
+    test_data_dict, _, _ = process_X_for_svgpvae(X_test, x_cols, RE_cols, aux_cols, pca, scaler)
+    return train_data_dict, eval_data_dict, test_data_dict
 
-def get_data_dict(X, x_cols, RE_cols):
+def process_X_for_svgpvae(X, x_cols, RE_cols, aux_cols, pca=None, scaler=None, M=None):
+    X_grouped = X.groupby(RE_cols).mean(x_cols)
+    X_index = X_grouped.index
+    if pca is None: # training data, perform PCA
+        if M is None:
+            M = int(X.shape[1] * 0.1)
+        pca = PCA(n_components=M)
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X_grouped.drop(aux_cols, axis=1))
+        X_trans = pd.DataFrame(pca.fit_transform(X_scaled), index = X_index)
+    else:
+        X_scaled = scaler.transform(X_grouped.drop(aux_cols, axis=1))
+        X_trans = pd.DataFrame(pca.transform(X_scaled), index = X_index)
+    X_aux = pd.merge(X[RE_cols + aux_cols], X_trans, on = RE_cols)
     data_dict = {
-        'data_Y': X[x_cols],
-        'aux_X': X[x_cols + RE_cols]
+        'data_Y': X[x_cols].drop(aux_cols, axis=1),
+        'aux_X': X_aux
     }
-    return data_dict
+    return data_dict, pca, scaler
 
 
 def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
