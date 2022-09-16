@@ -115,7 +115,7 @@ def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig
     # X_test_x_cols = pd.DataFrame(scaler.transform(X_test[x_cols]), index=X_test.index, columns=x_cols)
     # X_test = pd.concat([X_test_x_cols, X_test[RE_cols]], axis=1)
     # split train to train and eval?
-    X_train, X_eval = train_test_split(X_train, test_size=0.05)
+    X_train_new, X_eval_new = train_test_split(X_train, test_size=0.05)
 
     # get dictionaries
     RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix, mode, pca_type='svgpvae')
@@ -132,7 +132,7 @@ def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig
         raise ValueError(f'mode {mode} not recognized')
     M = 10
     nr_inducing_points = 16
-    train_data_dict, eval_data_dict, test_data_dict = process_data_for_svgpvae(X_train, X_test, X_eval, x_cols, aux_cols, RE_cols, M)
+    train_data_dict, eval_data_dict, test_data_dict = process_data_for_svgpvae(X_train_new, X_test, X_eval_new, x_cols, aux_cols, RE_cols, M)
     
     # run SVGPVAE
     X_reconstructed_te = run_experiment_SVGPVAE(train_data_dict, eval_data_dict, test_data_dict,
