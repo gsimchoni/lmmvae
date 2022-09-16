@@ -13,6 +13,7 @@ from lmmvae.pca import LMMPCA
 from lmmvae.utils import DRResult, get_columns_by_prefix, process_one_hot_encoding
 from lmmvae.vae import LMMVAE, VAE
 
+# TODO: Apparently these imports fail other VAE methods, probably because of TF1
 from SVGPVAE.TABULAR_experiment import run_experiment_SVGPVAE
 
 
