@@ -29,9 +29,9 @@ def get_dummies(vec, vec_max):
     return Z
 
 
-def get_columns_by_prefix(df, prefix, mode):
+def get_columns_by_prefix(df, prefix, mode, pca_type='lmmvae'):
     RE_cols = list(df.columns[df.columns.str.startswith(prefix)])
-    if mode == 'longitudinal':
+    if mode == 'longitudinal' and pca_type != 'svgpvae':
         RE_cols.append('t')
     return  RE_cols
 

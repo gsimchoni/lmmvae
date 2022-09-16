@@ -108,11 +108,17 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
 
 def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, mode,
     batch_size, epochs, patience, n_neurons, dropout, activation, verbose):
+    # RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix, mode)
+    # scaler = StandardScaler(with_std=False)
+    # X_train_x_cols = pd.DataFrame(scaler.fit_transform(X_train[x_cols]), index=X_train.index, columns=x_cols)
+    # X_train = pd.concat([X_train_x_cols, X_train[RE_cols]], axis=1)
+    # X_test_x_cols = pd.DataFrame(scaler.transform(X_test[x_cols]), index=X_test.index, columns=x_cols)
+    # X_test = pd.concat([X_test_x_cols, X_test[RE_cols]], axis=1)
     # split train to train and eval?
     X_train, X_eval = train_test_split(X_train, test_size=0.05)
 
     # get dictionaries
-    RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix, mode)
+    RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix, mode, pca_type='svgpvae')
     if mode == 'categorical':
         aux_cols = []
         q = qs[0]
@@ -125,13 +131,14 @@ def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig
     else:
         raise ValueError(f'mode {mode} not recognized')
     M = 10
-    nr_inducing_points = 64
+    nr_inducing_points = 16
     train_data_dict, eval_data_dict, test_data_dict = process_data_for_svgpvae(X_train, X_test, X_eval, x_cols, aux_cols, RE_cols, M)
     
     # run SVGPVAE
     X_reconstructed_te = run_experiment_SVGPVAE(train_data_dict, eval_data_dict, test_data_dict,
         d, q, batch_size, epochs, n_neurons, dropout, activation, elbo_arg='SVGPVAE_Hensman',
-        M = M, nr_inducing_points = nr_inducing_points, RE_cols=RE_cols, aux_cols=aux_cols)
+        M = M, nr_inducing_units=nr_inducing_points, nr_inducing_per_unit = 2,
+        RE_cols=RE_cols, aux_cols=aux_cols, GECO=False)
     none_sigmas = [None for _ in range(n_sig2bs)]
     none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
     return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], None
