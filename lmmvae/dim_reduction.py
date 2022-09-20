@@ -175,11 +175,11 @@ def process_X_for_svgpvae(X, x_cols, RE_cols, aux_cols, pca=None, scaler=None, M
     else:
         X_scaled = scaler.transform(X_grouped.drop(aux_cols, axis=1))
         X_trans = pd.DataFrame(pca.transform(X_scaled), index = X_index)
-    X_aux = pd.merge(X[RE_cols + aux_cols], X_trans, on = RE_cols)
+    X_aux = X[RE_cols + aux_cols].join(X_trans, on = RE_cols) #pd.merge(X[RE_cols + aux_cols], X_trans, on = RE_cols)
     perm = np.random.permutation(X_aux.shape[0])
     data_dict = {
-        'data_Y': X[x_cols].drop(aux_cols, axis=1).iloc[perm],
-        'aux_X': X_aux.iloc[perm]
+        'data_Y': X[x_cols].drop(aux_cols, axis=1),#.iloc[perm],
+        'aux_X': X_aux#.iloc[perm]
     }
     return data_dict, pca, scaler
 
