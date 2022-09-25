@@ -112,7 +112,7 @@ def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig
     aux_cols = get_aux_cols(mode)
     q = get_q_by_mode(qs, q_spatial, mode)
     svgpvae = SVGPVAE(d, q, x_cols, batch_size, epochs, patience, n_neurons, dropout, activation, verbose,
-        M, nr_inducing_points, nr_inducing_per_unit, RE_cols, aux_cols, beta, GECO=False, disable_gpu=True)
+        M, nr_inducing_points, nr_inducing_per_unit, RE_cols, aux_cols, beta, GECO=False, disable_gpu=False)
 
     if scale:
         x_cols_pca = [col for col in x_cols if col not in RE_cols + aux_cols]
