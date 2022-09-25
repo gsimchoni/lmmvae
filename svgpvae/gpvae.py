@@ -214,6 +214,7 @@ class SVGPVAE:
                     batch = 0
                     t = tqdm(generator(), total=int(N_train / self.batch_size), ascii=True, disable=not self.verbose)
                     for _ in t:
+                        t.set_description(f'epoch {epoch+1}/{nr_epochs}:')
                         try:
                             if self.GECO and training_regime[epoch] != 'VAE':
                                 if first_step:
@@ -236,15 +237,9 @@ class SVGPVAE:
                             elbos.append(elbo_)
                             losses.append(recon_loss_)
                             first_step = False  # switch for initizalition of GECO algorithm
-                            t.set_postfix(train_loss=round(recon_loss_/self.batch_size, 4))
                             batch += 1
+                            t.set_postfix({'train_loss': round(recon_loss_/self.batch_size, 4)})
                         except tf.errors.OutOfRangeError:
-                            if self.verbose and (epoch + 1) % 10 == 0:
-                                regime = training_regime[epoch] if "SVGPVAE" in elbo_arg else "VAE"
-                                print('Epoch {}, opt regime {}, mean ELBO per batch: {}'.format(epoch, regime,
-                                                                                                round(np.mean(elbos), 4)))
-                                MSE = np.sum(losses) / N_train
-                                print('MSE loss on train set for epoch {} : {}'.format(epoch, round(MSE, 4)))
                             break
 
                     # 7.2) calculate loss on valid set
@@ -260,7 +255,7 @@ class SVGPVAE:
                         except tf.errors.OutOfRangeError:
                             MSE_valid = np.sum(losses) / N_valid
                             if self.verbose:
-                                print('MSE loss on valid set for epoch {} : {}'.format(epoch, round(MSE_valid, 4)))
+                                t.write(f'valid_loss: {round(MSE_valid, 4)}')
                             # early stopping
                             if MSE_valid < best_valid_loss:
                                 best_valid_loss = MSE_valid
