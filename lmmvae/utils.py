@@ -29,15 +29,33 @@ def get_dummies(vec, vec_max):
     return Z
 
 
-def get_columns_by_prefix(df, prefix, mode, pca_type='lmmvae'):
+def get_RE_cols_by_prefix(df, prefix, mode, pca_type='lmmvae'):
     RE_cols = list(df.columns[df.columns.str.startswith(prefix)])
     if mode == 'longitudinal' and pca_type not in ['gppvae', 'svgpvae']:
         RE_cols.append('t')
     return  RE_cols
 
 
+def get_aux_cols(mode):
+    if mode == 'categorical':
+        return []
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+        return ['D1', 'D2']
+    if mode == 'longitudinal':
+        return ['t']
+    raise ValueError(f'mode {mode} not recognized')
+
+
+def get_q_by_mode(qs, q_spatial, mode):
+    if mode in ['categorical', 'longitudinal']:
+        return qs[0]
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+        return q_spatial
+    raise ValueError(f'mode {mode} not recognized')
+
+
 def process_one_hot_encoding(X_train, X_test, x_cols, RE_cols_prefix, mode):
-    RE_cols = get_columns_by_prefix(X_train, RE_cols_prefix, mode)
+    RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode)
     X_train_new = X_train[x_cols]
     X_test_new = X_test[x_cols]
     for RE_col in RE_cols:
