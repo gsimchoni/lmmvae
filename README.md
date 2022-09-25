@@ -1,1 +1,1 @@
-# LMMPCA
+# LMMVAE
