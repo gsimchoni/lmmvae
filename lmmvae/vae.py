@@ -120,7 +120,7 @@ class VAE:
         return self
 
     def _transform(self, X):
-        _, _, X_transformed = self.variational_encoder.predict(X)
+        _, _, X_transformed = self.variational_encoder.predict(X, verbose=0)
         return X_transformed
 
     def transform(self, X):
@@ -132,7 +132,7 @@ class VAE:
         return self._transform(X)
     
     def reconstruct(self, X_transformed):
-        X_reconstructed = self.variational_decoder.predict([X_transformed])
+        X_reconstructed = self.variational_decoder.predict([X_transformed], verbose=0)
         return X_reconstructed
 
     def get_history(self):
@@ -317,7 +317,7 @@ class LMMVAE:
     def _transform(self, X, U, B_list, extract_B):
         X_input = X[self.x_cols].copy()
         Z_inputs = [X[RE_col].copy() for RE_col in self.RE_cols]
-        encoder_output = self.variational_encoder.predict([X_input])
+        encoder_output = self.variational_encoder.predict([X_input], verbose=0)
         X_transformed = encoder_output[0]
         B_hat_list = encoder_output[1:]
         if extract_B:
@@ -357,7 +357,7 @@ class LMMVAE:
         return self._transform(X, U, B_list, reconstruct_B)
 
     def reconstruct(self, X_transformed, Z_idxs, B_list):
-        X_reconstructed = self.variational_decoder_no_re.predict([X_transformed])
+        X_reconstructed = self.variational_decoder_no_re.predict([X_transformed], verbose=0)
         if self.mode == 'longitudinal':
             Z0 = sparse.csr_matrix(get_dummies(Z_idxs.iloc[:, 0], self.qs[0]))
             t = Z_idxs.iloc[:, 1]
