@@ -54,7 +54,6 @@ log_params: False
 test_size: 0.2
 thresh: 0.0001
 RE_cols_prefix: 'z'
-longitudinal_predict_future: False
 dr_types:
   - 'pca-ignore'
   - 'pca-ohe'
