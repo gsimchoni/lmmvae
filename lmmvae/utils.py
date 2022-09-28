@@ -134,7 +134,7 @@ def process_X_for_svgpvae(X, x_cols, RE_cols, aux_cols, pca=None, scaler=None, M
         X_trans = pd.DataFrame(pca.fit_transform(X_scaled), index = X_index, columns=['PC' + str(i) for i in range(M)])
     else:
         X_scaled = scaler.transform(X_grouped.drop(aux_cols, axis=1))
-        X_trans = pd.DataFrame(pca.transform(X_scaled), index = X_index)
+        X_trans = pd.DataFrame(pca.transform(X_scaled), index = X_index, columns=['PC' + str(i) for i in range(M)])
     X_aux = X[RE_cols + aux_cols].join(X_trans, on = RE_cols)
     data_Y = X[x_cols].drop(aux_cols, axis=1)
     if shuffle:
