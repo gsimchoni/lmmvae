@@ -269,3 +269,38 @@ def batching_predict_SVGPVAE(test_data_batch, vae, svgp,
 
     return recon_data_Y_test, recon_loss
 
+
+def latent_samples_SVGPVAE(train_data_Y, train_aux_X, vae, svgp, clipping_qs=False):
+    """
+    Get latent samples for training data.
+
+    :param train_data_Y:
+    :param train_aux_X:
+    :param vae:
+    :param svgp:
+    :param clipping_qs:
+    :return:
+    """
+
+    # ENCODER NETWORK
+    qnet_mu, qnet_var = vae.encode(train_data_Y)
+    L = tf.cast(qnet_mu.get_shape()[1], dtype=vae.dtype)
+
+    # clipping of VAE posterior variance
+    if clipping_qs:
+        qnet_var = tf.clip_by_value(qnet_var, 1e-3, 10)
+
+    p_m, p_v = [], []
+    for l in range(qnet_mu.get_shape()[1]):  # iterate over latent dimensions
+        p_m_l, p_v_l, _, _ = svgp.approximate_posterior_params(train_aux_X, train_aux_X,
+                                                               qnet_mu[:, l], qnet_var[:, l])
+        p_m.append(p_m_l)
+        p_v.append(p_v_l)
+
+    p_m = tf.stack(p_m, axis=1)
+    p_v = tf.stack(p_v, axis=1)
+
+    epsilon = tf.random.normal(shape=tf.shape(p_m), dtype=vae.dtype)
+    latent_samples = p_m + epsilon * tf.sqrt(p_v)
+
+    return latent_samples

@@ -158,6 +158,12 @@ class SVGPVAE:
             # GP diagnostics
             GP_l, GP_amp, GP_ov, GP_ip = SVGP_.variable_summary()
 
+            # LV Extraction
+            X_transformed_tr = latent_samples_SVGPVAE(train_data_Y_placeholder, train_aux_X_placeholder,
+                                                                vae=VAE, svgp=SVGP_, clipping_qs=clip_qs)
+            X_transformed_te = latent_samples_SVGPVAE(test_data_Y_placeholder, test_aux_X_placeholder,
+                                                                vae=VAE, svgp=SVGP_, clipping_qs=clip_qs)
+
             # ====================== 3) optimizer ops ======================
             global_step = tf.Variable(0, name='global_step', trainable=False)
             train_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES)
@@ -317,9 +323,18 @@ class SVGPVAE:
                 cgen_test_set_MSE.append((epoch, recon_loss_cgen))
                 if self.verbose:
                     print("Conditional generation MSE loss on test set for epoch {}: {}".format(epoch, recon_loss_cgen))
+            
+                # LV generation:
+                X_transformed_tr_ = sess.run(X_transformed_tr,
+                    {train_data_Y_placeholder: train_data_dict['data_Y'],
+                    train_aux_X_placeholder: train_data_dict['aux_X']})
+                X_transformed_te_ = sess.run(X_transformed_te,
+                    {test_data_Y_placeholder: test_data_dict['data_Y'],
+                    test_aux_X_placeholder: test_data_dict['aux_X']})
+            
 
         self.n_epochs = epoch
-        return None, None, recon_data_Y_cgen
+        return X_transformed_tr_, X_transformed_te_, recon_data_Y_cgen
 
     def get_n_epochs(self):
         return self.n_epochs
