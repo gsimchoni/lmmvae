@@ -4,7 +4,6 @@ import gc
 from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
-from sklearn.model_selection import train_test_split
 from svgpvae.utils import *
 from svgpvae.classes import *
 from svgpvae.actions import *
@@ -41,7 +40,7 @@ class SVGPVAE:
             os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         
 
-    def run(self, X_train, X_test, valid_split=0.1):
+    def run(self, train_data_dict, valid_data_dict, test_data_dict):
         elbo_arg = 'SVGPVAE_Hensman'
         init_PCA=True
         ip_joint=True
@@ -56,12 +55,6 @@ class SVGPVAE:
         opt_regime=['joint']
         ram=1.0
 
-        # split train to train and valid
-        X_train_new, X_valid = train_test_split(X_train, test_size=valid_split)
-
-        train_data_dict, valid_data_dict, test_data_dict = process_data_for_svgpvae(
-            X_train_new, X_test, X_valid, self.x_cols, self.aux_cols, self.RE_cols, self.M)
-        
         graph = tf.Graph()
         with graph.as_default():
             train_data, _ = tensor_slice(train_data_dict, self.batch_size, placeholder=False)

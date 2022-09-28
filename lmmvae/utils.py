@@ -4,7 +4,10 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sparse
 from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 from scipy.spatial.distance import pdist, squareform
+
 
 DRResult = namedtuple(
     'PCAResult', ['metric_X', 'sigmas', 'rhos', 'n_epochs', 'time'])
@@ -93,6 +96,66 @@ def get_cov_mat(sig2bs, rhos, est_cors):
                     rho = 0
                 cov_mat[k, j] = rho * np.sqrt(sig2bs[k]) * np.sqrt(sig2bs[j])
     return cov_mat
+
+
+def get_train_ids_mask(train_data_dict, aux_cols):
+    unique_aux_values = train_data_dict['aux_X'].groupby(aux_cols, as_index=False).size()[aux_cols].values
+    train_aux = [train_data_dict['aux_X'][train_data_dict['aux_X']['z0'] == x][aux_cols].values for x in np.sort(np.unique(train_data_dict['aux_X']['z0']))]
+    train_ids_mask = np.array([np.isclose(x, y).sum() > 0 for y in train_aux for x in unique_aux_values])
+    return train_ids_mask
+
+def process_data_for_svgpvae(X_train, X_test, X_eval, x_cols, aux_cols, RE_cols, M, shuffle=False, add_train_index_aux=False, sort_train=False):
+    # What is objects data (on which SVGPVAE perform PCA to get more auxiliary data)?
+    # for a single categorical: data on q clusters
+    # for spatial data: data on q locations
+    # for longitudinal: data on q subjects
+    # but notice in all of SVGPVAE examples Y, an image, is predicted based on X, an image PCA-ed (+ "angle info")!
+    # in simulations we do not have features regarding q clusters/locations/subjects
+    # in real data we might
+    # but either way these should be concatenated to data *in all time/location/cluster dependent features* which comprise our X
+    # then GROUPED and AVERAGED BY subject/location/cluster, then concatenated back to "angle info", before performing PCA, 
+    # otherwise information in aux_X is missing to get good reconstructions in data_Y
+    # furthermore perform PCA on training data only! (in all SVGPVAE MNIST example the test data is a missing angle (image))
+    # then eval/test should be projected
+    train_data_dict, pca, scaler = process_X_for_svgpvae(X_train, x_cols, RE_cols, aux_cols, M = M, shuffle=shuffle, add_train_index_aux=add_train_index_aux, sort_train=sort_train)
+    eval_data_dict, _, _ = process_X_for_svgpvae(X_eval, x_cols, RE_cols, aux_cols, pca, scaler, M, shuffle)
+    test_data_dict, _, _ = process_X_for_svgpvae(X_test, x_cols, RE_cols, aux_cols, pca, scaler, M, shuffle)
+    return train_data_dict, eval_data_dict, test_data_dict
+
+def process_X_for_svgpvae(X, x_cols, RE_cols, aux_cols, pca=None, scaler=None, M=None, shuffle=False, add_train_index_aux=False, sort_train=False):
+    X_grouped = X.groupby(RE_cols)[x_cols].mean()
+    X_index = X_grouped.index
+    if M is None:
+        M = int(X.shape[1] * 0.1)
+    if pca is None: # training data, perform PCA
+        pca = PCA(n_components=M)
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X_grouped.drop(aux_cols, axis=1))
+        X_trans = pd.DataFrame(pca.fit_transform(X_scaled), index = X_index, columns=['PC' + str(i) for i in range(M)])
+    else:
+        X_scaled = scaler.transform(X_grouped.drop(aux_cols, axis=1))
+        X_trans = pd.DataFrame(pca.transform(X_scaled), index = X_index)
+    X_aux = X[RE_cols + aux_cols].join(X_trans, on = RE_cols)
+    data_Y = X[x_cols].drop(aux_cols, axis=1)
+    if shuffle:
+        perm = np.random.permutation(X_aux.shape[0])
+        data_Y = data_Y.iloc[perm]
+        X_aux = X_aux.iloc[perm]
+    if sort_train:
+        X_aux.index = np.arange(X_aux.shape[0])
+        data_Y.index = np.arange(X_aux.shape[0])
+        X_aux = X_aux.sort_values(RE_cols + aux_cols)
+        data_Y['id'] = np.arange(data_Y.shape[0])
+        data_Y['id'] = data_Y['id'].map({l: i for i, l in enumerate(X_aux.index)})
+        data_Y = data_Y.sort_values('id')
+        data_Y = data_Y.drop('id', axis=1)
+    if add_train_index_aux:
+        X_aux.insert(loc=0, column='id', value=np.arange(X_aux.shape[0]))
+    data_dict = {
+        'data_Y': data_Y,
+        'aux_X': X_aux
+    }
+    return data_dict, pca, scaler
 
 
 def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial_mean, rhos, sig2bs_identical, params):

@@ -1,17 +1,15 @@
 import gc
 import time
-import pickle
 
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
-from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error as mse
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 
 from lmmvae.pca import LMMPCA
-from lmmvae.utils import DRResult, get_RE_cols_by_prefix, get_aux_cols, get_q_by_mode, process_one_hot_encoding
+from lmmvae.utils import DRResult, get_RE_cols_by_prefix, get_aux_cols, get_q_by_mode, process_data_for_svgpvae, process_one_hot_encoding
 from lmmvae.vae import LMMVAE, VAE
 from svgpvae.gpvae import SVGPVAE
 
@@ -111,6 +109,7 @@ def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig
     RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode, pca_type='svgpvae')
     aux_cols = get_aux_cols(mode)
     q = get_q_by_mode(qs, q_spatial, mode)
+
     svgpvae = SVGPVAE(d, q, x_cols, batch_size, epochs, patience, n_neurons, dropout, activation, verbose,
         M, nr_inducing_points, nr_inducing_per_unit, RE_cols, aux_cols, beta, GECO=False, disable_gpu=False)
 
@@ -122,7 +121,10 @@ def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig
         X_test_x_cols = pd.DataFrame(scaler.transform(X_test[x_cols_pca]), index=X_test.index, columns=x_cols_pca)
         X_test = pd.concat([X_test_x_cols, X_test[RE_cols + aux_cols]], axis=1)
 
-    X_transformed_tr, X_transformed_te, X_reconstructed_te = svgpvae.run(X_train, X_test)
+    X_train_new, X_valid = train_test_split(X_train, test_size=0.1)
+    train_data_dict, valid_data_dict, test_data_dict = process_data_for_svgpvae(
+        X_train_new, X_test, X_valid, x_cols, aux_cols, RE_cols, M)
+    X_transformed_tr, X_transformed_te, X_reconstructed_te = svgpvae.run(train_data_dict, valid_data_dict, test_data_dict)
 
     if scale:
         X_reconstructed_te = scaler.inverse_transform(X_reconstructed_te)
