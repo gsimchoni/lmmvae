@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 
 from lmmvae.pca import LMMPCA
-from lmmvae.utils import DRResult, get_RE_cols_by_prefix, get_aux_cols, get_q_by_mode, process_data_for_svgpvae, process_one_hot_encoding, verify_M
+from lmmvae.utils import DRResult, get_RE_cols_by_prefix, get_aux_cols, verify_q, process_data_for_svgpvae, process_one_hot_encoding, verify_M, verify_RE_cols
 from lmmvae.vae import LMMVAE, VAE
 from svgpvae.gpvae import SVGPVAE
 
@@ -111,8 +111,9 @@ def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig
     batch_size, epochs, patience, n_neurons, dropout, activation, beta, M, nr_inducing_points, nr_inducing_per_unit, verbose, scale=False):
     RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode, pca_type='svgpvae')
     aux_cols = get_aux_cols(mode)
-    q = get_q_by_mode(qs, q_spatial, mode)
+    q = verify_q(qs, q_spatial, mode)
     M = verify_M(x_cols, M, RE_cols, aux_cols)
+    RE_cols = verify_RE_cols(mode, RE_cols)
 
     svgpvae = SVGPVAE(d, q, x_cols, batch_size, epochs, patience, n_neurons, dropout, activation, verbose,
         M, nr_inducing_points, nr_inducing_per_unit, RE_cols, aux_cols, beta, GECO=False, disable_gpu=False)

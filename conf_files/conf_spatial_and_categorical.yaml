@@ -8,9 +8,6 @@ sig2bs_mean_list:
   -
     - 0.3
     - 3.0
-  -
-    - 0.3
-    - 3.0
 sig2b_spatial_list:
   -
     - 0.3
@@ -19,18 +16,16 @@ sig2b_spatial_list:
     - 1.0
 q_list:
   -
-    - 300
-  -
-    - 300
+    - 3000
 q_spatial_list:
-  - 1000
+  - 10000
 latent_dimension_list:
   - 1
   - 2
 beta_list:
   - 0.001
 N_list:
-  - 10000
+  - 100000
 n_iter: 3
 n_per_cat: 3
 fixed_intercept: 1
@@ -45,7 +40,7 @@ Z_non_linear: False
 batch_size: 1000
 epochs: 1000
 patience: 10
-verbose: True
+verbose: False
 log_params: False
 test_size: 0.2
 thresh: 0.0001

@@ -42,18 +42,22 @@ def get_RE_cols_by_prefix(df, prefix, mode, pca_type='lmmvae'):
 def get_aux_cols(mode):
     if mode == 'categorical':
         return []
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'spatial_and_categorical']:
         return ['D1', 'D2']
     if mode == 'longitudinal':
         return ['t']
     raise ValueError(f'mode {mode} not recognized')
 
 
-def get_q_by_mode(qs, q_spatial, mode):
+def verify_q(qs, q_spatial, mode):
     if mode in ['categorical', 'longitudinal']:
         return qs[0]
     if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
         return q_spatial
+    if mode == 'spatial_and_categorical':
+        if len(qs) > 1:
+            raise ValueError(f'SVGPVAE is not implemented in spatial mode for more than 1 categorical features')
+        return qs[0]
     raise ValueError(f'mode {mode} not recognized')
 
 
@@ -325,3 +329,8 @@ def verify_M(x_cols, M, RE_cols, aux_cols):
             M = int(0.1 * n_cols_for_pca)
         raise Warning(f'M cannot be larger than no. of features in Y, choosing M = {M} instead')
     return M
+
+
+def verify_RE_cols(mode, RE_cols):
+    if mode == 'spatial_and_categorical' and len(RE_cols) > 1:
+        return RE_cols[1:]

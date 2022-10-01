@@ -103,7 +103,7 @@ class SVGPVAE:
             if ov_joint:
                 if init_PCA:  # use PCA embeddings for initialization of object vectors
                     PC_cols = train_data_dict['aux_X'].columns[train_data_dict['aux_X'].columns.str.startswith('PC')]
-                    object_vectors_init = train_data_dict['aux_X'].groupby('z0')[PC_cols].mean()
+                    object_vectors_init = train_data_dict['aux_X'].groupby(self.RE_cols)[PC_cols].mean()
                     object_vectors_init = object_vectors_init.reindex(range(self.q), fill_value=0)
                 else:  # initialize object vectors randomly
                     object_vectors_init = np.random.normal(0, 1.5, self.q * self.M).reshape(self.q, self.M)
