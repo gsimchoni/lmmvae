@@ -80,6 +80,13 @@ def simulation(out_file, params):
         sig2bs_spatial_est_names = ['sig2b_spatial_est0', 'sig2b_spatial_est1']
         q_spatial_name = ['q_spatial']
         q_spatial_list = params['q_spatial_list']
+    elif mode == 'spatial_and_categorical':
+        assert n_sig2bs == n_categoricals
+        assert n_sig2bs_spatial == 2
+        sig2bs_spatial_names = ['sig2b0_spatial', 'sig2b1_spatial']
+        sig2bs_spatial_est_names = ['sig2b_spatial_est0', 'sig2b_spatial_est1']
+        q_spatial_name = ['q_spatial']
+        q_spatial_list = params['q_spatial_list']
     elif mode == 'longitudinal':
         assert n_categoricals == 1
         rhos_names =  list(map(lambda x: 'rho' + str(x), range(n_rhos)))

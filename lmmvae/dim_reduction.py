@@ -100,7 +100,10 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
     # TODO: get rid of this
     if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
         sigmas_spatial = [sig2bs_mean_est[0], None]
-        sig2bs_mean_est = []
+        if mode == 'spatial_fit_categorical' and len(sig2bs_mean_est) > 1:
+            sig2bs_mean_est = sig2bs_mean_est[1:]
+        else:
+            sig2bs_mean_est = []
     return X_reconstructed_te, [None, sig2bs_mean_est, sigmas_spatial], n_epochs
 
 
@@ -227,7 +230,7 @@ def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
     else:
         raise ValueError(f'{dr_type} is an unknown dr_type')
     end = time.time()
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
         x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2', 't']]
     try:
         metric_X = mse(X_test[x_cols].values, X_reconstructed_te[:, :len(x_cols)])

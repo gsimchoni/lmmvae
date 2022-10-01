@@ -171,7 +171,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     else:
         fU = UW
     X = fU + mu + e
-    if mode == 'categorical':
+    if mode in ['categorical', 'spatial_and_categorical']:
         Z_idx_list = []
         B_list = []
         for k, q in enumerate(qs):
@@ -195,7 +195,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
             Z = get_dummies(Z_idx, q)
             X += Z @ B
             Z_idx_list.append(Z_idx)
-    elif mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'spatial_and_categorical']:
         if sig2bs_spatial_mean[0] < 1:
             fs_factor = sig2bs_spatial_mean[0]
         else:
@@ -232,13 +232,16 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         ps = fs / fs_sum
         ns = np.random.multinomial(n, ps)
         Z_idx = np.repeat(range(q_spatial), ns)
-        Z_idx_list = [Z_idx]
+        if mode == 'spatial_and_categorical':
+            Z_idx_list.insert(0, Z_idx)
+        else:
+            Z_idx_list = [Z_idx]
         Z = get_dummies(Z_idx, q_spatial)
         X += Z @ B
         coords_df = pd.DataFrame(coords[Z_idx])
         co_cols = ['D1', 'D2']
         coords_df.columns = co_cols
-    elif mode == 'longitudinal':
+    if mode == 'longitudinal':
         B_list = []
         fs = np.random.poisson(params['n_per_cat'], qs[0]) + 1
         fs_sum = fs.sum()
@@ -292,7 +295,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     df.columns = x_cols
     for k, Z_idx in enumerate(Z_idx_list):
         df['z' + str(k)] = Z_idx
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'spatial_and_categorical']:
         df = pd.concat([df, coords_df], axis=1)
         x_cols.extend(co_cols)
     if mode == 'longitudinal':

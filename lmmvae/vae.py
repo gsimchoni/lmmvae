@@ -162,15 +162,17 @@ class LMMVAE:
         self.mode = mode
         self.qs = qs
         self.n_sig2bs = n_sig2bs
-        self.n_RE_inputs = len(self.qs) if mode == 'categorical' else 1
-        self.n_RE_outputs = self.n_sig2bs if mode == 'longitudinal' else self.n_RE_inputs
-        if self.mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+        if self.mode == 'spatial_fit_categorical':
+            self.qs = [q_spatial] + list(qs)
+        if self.mode in ['spatial', 'spatial2']:
             self.qs = [q_spatial]
             self.kernel_root = tf.constant(kernel_root, dtype=tf.float32)
             if self.mode == 'spatial':
                 kernel_root_inv = np.linalg.solve(self.kernel_root, np.eye(self.kernel_root.shape[0]))
                 kernel_root_inv = np.clip(kernel_root_inv, -10, 10)
                 self.kernel_inv = tf.constant(np.dot(kernel_root_inv.T, kernel_root_inv).astype(np.float32))
+        self.n_RE_inputs = len(self.qs) if mode in ['categorical', 'spatial_fit_categorical'] else 1
+        self.n_RE_outputs = self.n_sig2bs if mode == 'longitudinal' else self.n_RE_inputs
         self.callbacks = [EarlyStopping(monitor='val_loss',
                                         patience=self.epochs if patience is None else patience)]
         X_input = Input(shape=p)
