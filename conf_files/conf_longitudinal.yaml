@@ -60,4 +60,4 @@ dr_types:
   - 'vae-ignore'
   - 'vae-ohe'
   - 'lmmvae'
-  - 'svgpvae-16-2'
+  - 'svgpvae-10-16-2'

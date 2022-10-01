@@ -50,4 +50,4 @@ dr_types:
   - 'vae-ignore'
   - 'lmmvae'
   - 'lmmvae-sfc'
-  - 'svgpvae-16-2'
+  - 'svgpvae-10-16-2'

@@ -311,3 +311,14 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     X_test = X_test.sort_index()
     U_train = U[X_train.index]
     return Data(X_train, X_test, W, U_train, B_list, x_cols, kernel_root)
+
+
+def verify_M(x_cols, M, RE_cols, aux_cols):
+    n_cols_for_pca = len([col for col in x_cols if col not in RE_cols + aux_cols])
+    if n_cols_for_pca < M:
+        if n_cols_for_pca < 10:
+            M = n_cols_for_pca
+        else:
+            M = int(0.1 * n_cols_for_pca)
+        raise Warning(f'M cannot be larger than no. of features in Y, choosing M = {M} instead')
+    return M

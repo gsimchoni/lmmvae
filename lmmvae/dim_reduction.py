@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 
 from lmmvae.pca import LMMPCA
-from lmmvae.utils import DRResult, get_RE_cols_by_prefix, get_aux_cols, get_q_by_mode, process_data_for_svgpvae, process_one_hot_encoding
+from lmmvae.utils import DRResult, get_RE_cols_by_prefix, get_aux_cols, get_q_by_mode, process_data_for_svgpvae, process_one_hot_encoding, verify_M
 from lmmvae.vae import LMMVAE, VAE
 from svgpvae.gpvae import SVGPVAE
 
@@ -109,6 +109,7 @@ def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig
     RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode, pca_type='svgpvae')
     aux_cols = get_aux_cols(mode)
     q = get_q_by_mode(qs, q_spatial, mode)
+    M = verify_M(x_cols, M, RE_cols, aux_cols)
 
     svgpvae = SVGPVAE(d, q, x_cols, batch_size, epochs, patience, n_neurons, dropout, activation, verbose,
         M, nr_inducing_points, nr_inducing_per_unit, RE_cols, aux_cols, beta, GECO=False, disable_gpu=False)
@@ -214,10 +215,10 @@ def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, 'spatial_fit_categorical', beta, kernel, verbose, U, B_list)
     elif dr_type.startswith('svgpvae'):
         dr_type_split = dr_type.split('-')
-        nr_inducing_points, nr_inducing_per_unit = int(dr_type_split[1]), int(dr_type_split[2])
+        M, nr_inducing_points, nr_inducing_per_unit = int(dr_type_split[1]), int(dr_type_split[2]), int(dr_type_split[3])
         X_reconstructed_te, sigmas, n_epochs = run_svgpvae(
             X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, mode, batch_size,
-            epochs, patience, n_neurons, dropout, activation, beta, M=10, nr_inducing_points=nr_inducing_points,
+            epochs, patience, n_neurons, dropout, activation, beta, M=M, nr_inducing_points=nr_inducing_points,
             nr_inducing_per_unit=nr_inducing_per_unit, verbose=verbose)
     elif dr_type == 'gppvae':
         X_reconstructed_te, sigmas, n_epochs = run_gppvae(
