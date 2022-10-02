@@ -78,7 +78,7 @@ def run_vae(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial,
 def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
                epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, verbose, U, B_list):
     RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode)
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
         x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2', 't']]
     lmmvae = LMMVAE(mode, X_train[x_cols].shape[1], x_cols, RE_cols, qs, q_spatial,
                     d, n_sig2bs, re_prior, batch_size, epochs, patience, n_neurons, n_neurons_re,
@@ -98,9 +98,9 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
     sig2bs_mean_est = [np.mean(sig2bs) for sig2bs in sig2bs_hat_list]
     sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
     # TODO: get rid of this
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'spatial_and_categorical']:
         sigmas_spatial = [sig2bs_mean_est[0], None]
-        if mode == 'spatial_fit_categorical' and len(sig2bs_mean_est) > 1:
+        if mode in ['spatial_fit_categorical', 'spatial_and_categorical'] and len(sig2bs_mean_est) > 1:
             sig2bs_mean_est = sig2bs_mean_est[1:]
         else:
             sig2bs_mean_est = []

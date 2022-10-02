@@ -230,7 +230,6 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
             jitter = 1e-05
             kernel_root = np.linalg.cholesky(kernel + jitter * np.eye(kernel.shape[0]))
         B = M + (kernel_root @ A) @ D_root
-        B_list = [B]
         fs = np.random.poisson(params['n_per_cat'], q_spatial) + 1
         fs_sum = fs.sum()
         ps = fs / fs_sum
@@ -238,8 +237,10 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         Z_idx = np.repeat(range(q_spatial), ns)
         if mode == 'spatial_and_categorical':
             Z_idx_list.insert(0, Z_idx)
+            B_list.insert(0, B)
         else:
             Z_idx_list = [Z_idx]
+            B_list = [B]
         Z = get_dummies(Z_idx, q_spatial)
         X += Z @ B
         coords_df = pd.DataFrame(coords[Z_idx])

@@ -8,6 +8,9 @@ sig2bs_mean_list:
   -
     - 0.3
     - 3.0
+  -
+    - 0.3
+    - 3.0
 sig2b_spatial_list:
   -
     - 0.3
@@ -15,6 +18,8 @@ sig2b_spatial_list:
   -
     - 1.0
 q_list:
+  -
+    - 3000
   -
     - 3000
 q_spatial_list:
@@ -40,7 +45,7 @@ Z_non_linear: False
 batch_size: 1000
 epochs: 1000
 patience: 10
-verbose: False
+verbose: True
 log_params: False
 test_size: 0.2
 thresh: 0.0001
@@ -48,7 +53,7 @@ RE_cols_prefix: 'z'
 dr_types:
   - 'pca-ignore'
   - 'pca-ohe'
-  - 'vae-ohe'
   - 'vae-ignore'
+  - 'vae-ohe'
+  - 'lmmvae'
   - 'lmmvae-sfc'
-  - 'svgpvae-10-16-2'
