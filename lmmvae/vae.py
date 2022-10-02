@@ -160,17 +160,20 @@ class LMMVAE:
         self.RE_cols = RE_cols
         self.p = p
         self.mode = mode
-        self.qs = qs
         self.n_sig2bs = n_sig2bs
-        self.n_RE_inputs = len(self.qs) if mode == 'categorical' else 1
-        self.n_RE_outputs = self.n_sig2bs if mode == 'longitudinal' else self.n_RE_inputs
-        if self.mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+        self.qs = qs
+        if self.mode in ['spatial_fit_categorical', 'spatial_and_categorical']:
+            self.qs = [q_spatial] + list(qs)
+        if self.mode in ['spatial', 'spatial2']:
             self.qs = [q_spatial]
+        if self.mode in ['spatial', 'spatial2', 'spatial_and_categorical']:
             self.kernel_root = tf.constant(kernel_root, dtype=tf.float32)
             if self.mode == 'spatial':
                 kernel_root_inv = np.linalg.solve(self.kernel_root, np.eye(self.kernel_root.shape[0]))
                 kernel_root_inv = np.clip(kernel_root_inv, -10, 10)
                 self.kernel_inv = tf.constant(np.dot(kernel_root_inv.T, kernel_root_inv).astype(np.float32))
+        self.n_RE_inputs = len(self.qs) if mode in ['categorical', 'spatial_fit_categorical', 'spatial_and_categorical'] else 1
+        self.n_RE_outputs = self.n_sig2bs if mode == 'longitudinal' else self.n_RE_inputs
         self.callbacks = [EarlyStopping(monitor='val_loss',
                                         patience=self.epochs if patience is None else patience)]
         X_input = Input(shape=p)
@@ -196,7 +199,7 @@ class LMMVAE:
         codings_mean = Dense(d)(z1)
         codings_log_var = Dense(d)(z1)
         z2 = add_layers_functional(X_input, n_neurons_re, dropout, activation, p)
-        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
+        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
             re_codings_mean_list = []
             re_codings_log_var_list = []
             re_codings_list = []
@@ -226,7 +229,7 @@ class LMMVAE:
 
         decoder_inputs = Input(shape=d)
         decoder_re_inputs_list = []
-        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
+        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
             for _ in range(self.n_RE_outputs):
                 decoder_re_inputs = Input(shape=p)
                 decoder_re_inputs_list.append(decoder_re_inputs)
@@ -240,14 +243,14 @@ class LMMVAE:
         x = add_layers_functional(decoder_inputs, n_neurons_rev, dropout_rev, activation, d)
         decoder_output = Dense(p)(x)
         outputs = decoder_output
-        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
+        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
             for i in range(self.n_RE_outputs):
                 Z = Z_mats[i]
                 decoder_re_inputs = decoder_re_inputs_list[i]
                 q_ind = 0 if self.mode == 'longitudinal' else i
                 Z0 = Z_mats[q_ind]
                 B = tf.math.divide_no_nan(K.dot(K.transpose(Z0), decoder_re_inputs), K.reshape(K.sum(Z0, axis=0), (self.qs[q_ind], 1)))
-                if mode == 'spatial2':
+                if mode == 'spatial2' or (mode == 'spatial_and_categorical' and i == 0):
                     B = self.kernel_root @ B
                 ZB = K.dot(Z, B)
                 outputs += ZB
@@ -277,7 +280,7 @@ class LMMVAE:
             1 + codings_log_var -
             K.exp(codings_log_var) - K.square(codings_mean),
             axis=-1)
-        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
+        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
             for i in range(self.n_RE_outputs):
                 re_codings_mean = re_codings_mean_list[i]
                 re_codings_log_var = re_codings_log_var_list[i]
@@ -329,14 +332,14 @@ class LMMVAE:
     
     def extract_Bs_to_compare(self, Z_inputs, B_hat_list):
         B_df2_list = []
-        if self.mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal']:
+        if self.mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
             for i in range(self.n_RE_outputs):
                 B_df = pd.DataFrame(B_hat_list[i])
                 q_ind = 0 if self.mode == 'longitudinal' else i
                 B_df['z'] = Z_inputs[q_ind].values
                 B_df2 = B_df.groupby('z')[B_df.columns[:self.p]].mean()
                 B_df2 = B_df2.reindex(range(self.qs[q_ind]), fill_value=0)
-                if self.mode == 'spatial2':
+                if self.mode == 'spatial2' or (self.mode == 'spatial_and_categorical' and i == 0):
                     B_df2 = pd.DataFrame(self.kernel_root.numpy() @ B_df2.values)
                 B_df2_list.append(B_df2)
         elif self.mode in ['spatial']:
