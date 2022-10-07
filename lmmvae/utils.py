@@ -22,7 +22,7 @@ DRInput = namedtuple('PCAInput',
     'rhos', 'sig2bs_identical', 'beta', 're_prior',
     'k', 'n_sig2bs', 'n_sig2bs_spatial', 'estimated_cors', 'epochs', 'RE_cols_prefix',
     'thresh', 'batch_size', 'patience', 'n_neurons', 'n_neurons_re', 'dropout',
-    'activation', 'verbose'])
+    'activation', 'pred_unknown_clusters', 'verbose'])
 
 
 def get_dummies(vec, vec_max):
@@ -208,7 +208,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
             sig2bs_spatial = np.repeat(sig2bs_spatial_mean[0], p)
         else:
             sig2bs_spatial = (np.random.poisson(sig2bs_spatial_mean[0], p) + 1) * fs_factor
-        coords = np.stack([np.random.uniform(-10, 10, q_spatial), np.random.uniform(-10, 10, q_spatial)], axis=1)
+        coords = np.stack([np.random.uniform(-1, 1, q_spatial), np.random.uniform(-1, 1, q_spatial)], axis=1)
         # ind = np.lexsort((coords[:, 1], coords[:, 0]))    
         # coords = coords[ind]
         dist_matrix = squareform(pdist(coords)) ** 2
@@ -307,13 +307,23 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         df['t'] = t
         x_cols.append('t')
         pred_future = params.get('longitudinal_predict_future', False)
+        if pred_future:
+            # test set is "the future" or those obs with largest t
+            df.sort_values('t', inplace=True)
     else:
         pred_future = False
     test_size = params.get('test_size', 0.2)
-    if pred_future:
-        # test set is "the future" or those obs with largest t
-        df.sort_values('t', inplace=True)
-    X_train, X_test = train_test_split(df, test_size=test_size, shuffle=not pred_future)
+    pred_unknown_clusters = params.get('pred_unknown_clusters', False)
+    if pred_unknown_clusters:
+        if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'spatial_and_categorical']:
+            cluster_q = q_spatial
+        else:
+            cluster_q = qs[0]
+        train_clusters, test_clusters = train_test_split(range(cluster_q), test_size=test_size)
+        X_train = df[df['z0'].isin(train_clusters)]
+        X_test = df[df['z0'].isin(test_clusters)]
+    else:
+        X_train, X_test = train_test_split(df, test_size=test_size, shuffle=not pred_future)
     # TODO: why is this necessary?
     X_train = X_train.sort_index()
     X_test = X_test.sort_index()
