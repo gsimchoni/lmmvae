@@ -9,7 +9,9 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 
 from lmmvae.pca import LMMPCA
-from lmmvae.utils import DRResult, get_RE_cols_by_prefix, get_aux_cols, verify_q, process_data_for_svgpvae, process_one_hot_encoding, verify_M, verify_RE_cols
+from lmmvae.utils import DRResult, get_RE_cols_by_prefix, get_aux_cols, verify_q, \
+    process_data_for_svgpvae, process_one_hot_encoding, verify_M, verify_RE_cols, \
+        decrease_spatial_resolution
 from lmmvae.vae import LMMVAE, VAE
 from svgpvae.gpvae import SVGPVAE
 
@@ -52,14 +54,14 @@ def run_lmmpca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, to
 
 def run_vae(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial,
                x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
-               mode, n_sig2bs, beta, verbose, ignore_RE=False):
+               mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False):
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
     else:
         X_train, X_test = process_one_hot_encoding(
             X_train, X_test, x_cols, RE_cols_prefix, mode)
     vae = VAE(X_train.shape[1], d, batch_size, epochs, patience, n_neurons,
-              dropout, activation, beta, verbose)
+              dropout, activation, beta, pred_unknown_clusters, verbose)
 
     # scaler = StandardScaler()
     # X_train = scaler.fit_transform(X_train)
@@ -76,13 +78,17 @@ def run_vae(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial,
 
 
 def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
-               epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, verbose, U, B_list):
+               epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel_root, pred_unknown_clusters,
+               max_spatial_locs, verbose, U, B_list):
     RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode)
     if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
         x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2', 't']]
+    if max_spatial_locs is not None and mode in ['spatial', 'spatial2', 'spatial_and_categorical'] and q_spatial > max_spatial_locs:
+        print(f'Warning: decreasing spatial resolution, max spatial locations allowed is {max_spatial_locs}')
+        X_train, X_test, kernel_root, q_spatial = decrease_spatial_resolution(X_train, X_test, max_spatial_locs)
     lmmvae = LMMVAE(mode, X_train[x_cols].shape[1], x_cols, RE_cols, qs, q_spatial,
                     d, n_sig2bs, re_prior, batch_size, epochs, patience, n_neurons, n_neurons_re,
-                    dropout, activation, beta, kernel, verbose)
+                    dropout, activation, beta, kernel_root, pred_unknown_clusters, verbose)
 
     # scaler = StandardScaler(with_std=False)
     # X_train_x_cols = pd.DataFrame(scaler.fit_transform(X_train[x_cols]), index=X_train.index, columns=x_cols)
@@ -93,6 +99,7 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
     X_transformed_tr, B_hat_list, sig2bs_hat_list = lmmvae.fit_transform(X_train, U, B_list)
     X_transformed_te, _, _ = lmmvae.transform(X_test, U, B_list)
     X_reconstructed_te = lmmvae.reconstruct(X_transformed_te, X_test[RE_cols], B_hat_list)
+    # X_reconstructed_te = scaler.inverse_transform(X_reconstructed_te)
 
     n_epochs = len(lmmvae.get_history().history['loss'])
     sig2bs_mean_est = [np.mean(sig2bs) for sig2bs in sig2bs_hat_list]
@@ -189,7 +196,8 @@ def run_gppvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2
 def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             thresh, epochs, qs, q_spatial, n_sig2bs, n_sig2bs_spatial,
             est_cors, batch_size, patience, n_neurons, n_neurons_re, dropout,
-            activation, mode, beta, re_prior, kernel, verbose, U, B_list):
+            activation, mode, beta, re_prior, kernel, pred_unknown_clusters,
+            max_spatial_locs, verbose, U, B_list):
     gc.collect()
     start = time.time()
     if dr_type == 'pca-ignore':
@@ -204,19 +212,21 @@ def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
     elif dr_type == 'vae-ignore':
         X_reconstructed_te, sigmas, n_epochs = run_vae(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
-            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, verbose, ignore_RE=True)
+            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=True)
     elif dr_type == 'vae-ohe':
         X_reconstructed_te, sigmas, n_epochs = run_vae(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
-            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, verbose, ignore_RE=False)
+            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False)
     elif dr_type == 'lmmvae':
         X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
-            epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, verbose, U, B_list)
+            epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, pred_unknown_clusters,
+            max_spatial_locs, verbose, U, B_list)
     elif dr_type == 'lmmvae-sfc':
         X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
-            epochs, patience, n_neurons, n_neurons_re, dropout, activation, 'spatial_fit_categorical', beta, kernel, verbose, U, B_list)
+            epochs, patience, n_neurons, n_neurons_re, dropout, activation, 'spatial_fit_categorical', beta, kernel, pred_unknown_clusters,
+            max_spatial_locs, verbose, U, B_list)
     elif dr_type.startswith('svgpvae'):
         dr_type_split = dr_type.split('-')
         M, nr_inducing_points, nr_inducing_per_unit = int(dr_type_split[1]), int(dr_type_split[2]), int(dr_type_split[3])

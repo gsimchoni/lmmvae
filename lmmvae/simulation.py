@@ -40,8 +40,10 @@ def run_dr(dr_in, dr_type):
                 dr_in.RE_cols_prefix, dr_in.d, dr_type, dr_in.thresh,
                 dr_in.epochs, dr_in.qs, dr_in.q_spatial, dr_in.n_sig2bs,
                 dr_in.n_sig2bs_spatial, dr_in.estimated_cors, dr_in.batch_size,
-                dr_in.patience, dr_in.n_neurons, dr_in.n_neurons_re, dr_in.dropout, dr_in.activation,
-                dr_in.mode, dr_in.beta, dr_in.re_prior, dr_in.kernel, dr_in.verbose, dr_in.U, dr_in.B_list)
+                dr_in.patience, dr_in.n_neurons, dr_in.n_neurons_re, dr_in.dropout,
+                dr_in.activation, dr_in.mode, dr_in.beta, dr_in.re_prior,
+                dr_in.kernel, dr_in.pred_unknown_clusters,
+                dr_in.max_spatial_locs, dr_in.verbose, dr_in.U, dr_in.B_list)
 
 
 def summarize_sim(dr_in, res, dr_type):
@@ -70,6 +72,8 @@ def simulation(out_file, params):
     rhos_names =  []
     rhos_est_names =  []
     n_neurons_re = params.get('n_neurons_re', params['n_neurons'])
+    pred_unknown_clusters = params.get('pred_unknown_clusters', False)
+    max_spatial_locs = params.get('max_spatial_locs', None)
     if mode == 'categorical':
         assert n_sig2bs == n_categoricals
     elif mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
@@ -134,6 +138,7 @@ def simulation(out_file, params):
                                                                 params['thresh'], params['batch_size'],
                                                                 params['patience'],
                                                                 params['n_neurons'], n_neurons_re, params['dropout'],
-                                                                params['activation'], params['verbose'])
+                                                                params['activation'], pred_unknown_clusters,
+                                                                max_spatial_locs, params['verbose'])
                                                 iterate_dr_types(counter, res_df, out_file,
                                                                 dr_in, params['dr_types'], params['verbose'])

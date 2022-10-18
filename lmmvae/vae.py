@@ -7,6 +7,7 @@ import tensorflow as tf
 import tensorflow.keras.backend as K
 from packaging import version
 from sklearn.utils.validation import check_is_fitted
+from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import Concatenate, Dense, Dropout, Input, Layer
 from tensorflow.keras.layers.experimental.preprocessing import CategoryEncoding
@@ -68,12 +69,13 @@ class VAE:
     """
 
     def __init__(self, p, d, batch_size, epochs, patience, n_neurons,
-                 dropout, activation, beta, verbose) -> None:
+                 dropout, activation, beta, pred_unknown_clusters, verbose) -> None:
         super().__init__()
         self.batch_size = batch_size
         self.epochs = epochs
         self.patience = patience
         self.verbose = verbose
+        self.pred_unknown_clusters = pred_unknown_clusters
         self.history = None
         self.callbacks = [EarlyStopping(monitor='val_loss',
                                         patience=self.epochs if patience is None else patience)]
@@ -147,7 +149,7 @@ class LMMVAE:
 
     def __init__(self, mode, p, x_cols, RE_cols, qs, q_spatial, d, n_sig2bs,
                 re_prior, batch_size, epochs, patience, n_neurons, n_neurons_re,
-                dropout, activation, beta, kernel_root, verbose) -> None:
+                dropout, activation, beta, kernel_root, pred_unknown_clusters, verbose) -> None:
         super().__init__()
         K.clear_session()
         self.batch_size = batch_size
@@ -160,6 +162,7 @@ class LMMVAE:
         self.RE_cols = RE_cols
         self.p = p
         self.mode = mode
+        self.pred_unknown_clusters = pred_unknown_clusters
         self.n_sig2bs = n_sig2bs
         self.qs = qs
         if self.mode in ['spatial_fit_categorical', 'spatial_and_categorical']:
@@ -308,9 +311,21 @@ class LMMVAE:
     def _fit(self, X):
         X_input = X[self.x_cols].copy()
         Z_inputs = [X[RE_col].copy() for RE_col in self.RE_cols]
-        self.history = self.variational_ae.fit([X_input] + Z_inputs, X, epochs=self.epochs,
-            callbacks=self.callbacks, batch_size=self.batch_size, validation_split=0.1,
-            verbose=self.verbose)
+        if self.pred_unknown_clusters:
+            Z_inputs_train, Z_inputs_valid = train_test_split(Z_inputs[0].unique(), test_size=0.1)
+            Z_inputs_train = [Z_inputs[0][Z_inputs[0].isin(Z_inputs_train)]]
+            Z_inputs_valid = [Z_inputs[0][Z_inputs[0].isin(Z_inputs_valid)]]
+            X_input_train = X_input.loc[Z_inputs_train[0].index]
+            X_input_valid = X_input.loc[Z_inputs_valid[0].index]
+            X_train = X.loc[Z_inputs_train[0].index]
+            X_valid = X.loc[Z_inputs_valid[0].index]
+            self.history = self.variational_ae.fit([X_input_train] + Z_inputs_train, X_train, epochs=self.epochs,
+                callbacks=self.callbacks, batch_size=self.batch_size, validation_data=([X_input_valid] + Z_inputs_valid, X_valid),
+                verbose=self.verbose)
+        else:
+            self.history = self.variational_ae.fit([X_input] + Z_inputs, X, epochs=self.epochs,
+                callbacks=self.callbacks, batch_size=self.batch_size, validation_split=0.1,
+                verbose=self.verbose)
         gc.collect()
 
     def fit(self, X):
