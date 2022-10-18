@@ -22,7 +22,7 @@ DRInput = namedtuple('PCAInput',
     'rhos', 'sig2bs_identical', 'beta', 're_prior',
     'k', 'n_sig2bs', 'n_sig2bs_spatial', 'estimated_cors', 'epochs', 'RE_cols_prefix',
     'thresh', 'batch_size', 'patience', 'n_neurons', 'n_neurons_re', 'dropout',
-    'activation', 'pred_unknown_clusters', 'verbose'])
+    'activation', 'pred_unknown_clusters', 'max_spatial_locs', 'verbose'])
 
 
 def get_dummies(vec, vec_max):
@@ -160,6 +160,42 @@ def process_X_for_svgpvae(X, x_cols, RE_cols, aux_cols, pca=None, scaler=None, M
         'aux_X': X_aux
     }
     return data_dict, pca, scaler
+
+
+def decrease_spatial_resolution(X_train, X_test, max_spatial_locs, lengthscale=1.0):
+    X_train, X_test = X_train.copy(), X_test.copy()
+    min_D1_tr, max_D1_tr = X_train['D1'].min(), X_train['D1'].max()
+    min_D2_tr, max_D2_tr = X_train['D2'].min(), X_train['D2'].max()
+    min_D1_te, max_D1_te = X_test['D1'].min(), X_test['D1'].max()
+    min_D2_te, max_D2_te = X_test['D2'].min(), X_test['D2'].max()
+    min_D1, max_D1 = np.min([min_D1_tr, min_D1_te]), np.max([max_D1_tr, max_D1_te])
+    min_D2, max_D2 = np.min([min_D2_tr, min_D2_te]), np.max([max_D2_tr, max_D2_te])
+    D1_ticks = np.concatenate([[-np.inf], np.linspace(min_D1, max_D1, int(np.sqrt(max_spatial_locs)))])
+    D2_ticks = np.concatenate([[-np.inf], np.linspace(min_D2, max_D2, int(np.sqrt(max_spatial_locs)))])
+    X_train['D1'] = pd.cut(X_train['D1'], bins=D1_ticks, labels=D1_ticks[1:])
+    X_train['D2'] = pd.cut(X_train['D2'], bins=D2_ticks, labels=D2_ticks[1:])
+    X_test['D1'] = pd.cut(X_test['D1'], bins=D1_ticks, labels=D1_ticks[1:])
+    X_test['D2'] = pd.cut(X_test['D2'], bins=D2_ticks, labels=D2_ticks[1:])
+    coords_dict_df = pd.concat([X_train[['D1', 'D2']], X_test[['D1', 'D2']]]).groupby(['D1', 'D2']).size().to_frame()
+    # coords_dict_df = coords_dict_df[coords_dict_df > 0].to_frame()
+    coords_dict_df['z'] = np.arange(coords_dict_df.shape[0])
+    coords_dict = coords_dict_df['z'].to_dict()
+    # TODO: probably best to use join...
+    X_train['z0'] = X_train[['D1', 'D2']].apply(lambda x: coords_dict[(x[0], x[1])], axis=1)
+    X_test['z0'] = X_test[['D1', 'D2']].apply(lambda x: coords_dict[(x[0], x[1])], axis=1)
+    new_q_spatial = len(coords_dict)
+    D1_coords = np.array(coords_dict_df.reset_index()['D1'].value_counts().index)
+    D2_coords = np.array(coords_dict_df.reset_index()['D2'].value_counts().index)
+    xx, yy = np.meshgrid(D1_ticks[1:], D2_ticks[1:])
+    coords = np.array((xx.ravel(), yy.ravel())).T
+    dist_matrix = squareform(pdist(coords)) ** 2
+    kernel = np.exp(-dist_matrix / (2 * lengthscale))
+    try:
+        kernel_root = np.linalg.cholesky(kernel)
+    except:
+        jitter = 1e-05
+        kernel_root = np.linalg.cholesky(kernel + jitter * np.eye(kernel.shape[0]))
+    return X_train, X_test, kernel_root, new_q_spatial
 
 
 def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial_mean, rhos, sig2bs_identical, params):
