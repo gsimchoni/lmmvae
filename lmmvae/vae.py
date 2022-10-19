@@ -9,7 +9,7 @@ from packaging import version
 from sklearn.utils.validation import check_is_fitted
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.layers import Concatenate, Dense, Dropout, Input, Layer
+from tensorflow.keras.layers import Concatenate, Dense, Dropout, Input, Layer, Embedding, Reshape
 from tensorflow.keras.layers.experimental.preprocessing import CategoryEncoding
 from tensorflow.keras.losses import MeanSquaredError
 from tensorflow.keras.models import Model
@@ -69,23 +69,42 @@ class VAE:
     """
 
     def __init__(self, p, d, batch_size, epochs, patience, n_neurons,
-                 dropout, activation, beta, pred_unknown_clusters, verbose) -> None:
+                 dropout, activation, beta, pred_unknown_clusters, embed_RE,
+                 qs, x_cols, RE_cols, verbose) -> None:
         super().__init__()
         self.batch_size = batch_size
         self.epochs = epochs
         self.patience = patience
         self.verbose = verbose
         self.pred_unknown_clusters = pred_unknown_clusters
+        self.embed_RE = embed_RE
+        self.qs = qs
+        self.RE_cols = RE_cols
+        self.x_cols = x_cols
+        self.Z_embed_dim = 10
         self.history = None
         self.callbacks = [EarlyStopping(monitor='val_loss',
                                         patience=self.epochs if patience is None else patience)]
-        inputs = Input(shape=p)
-        z = add_layers_functional(inputs, n_neurons, dropout, activation, p)
+        X_input = Input(shape=p)
+        Z_inputs = []
+        concat = X_input
+        input_dim = p
+        if self.embed_RE:
+            embeds = []
+            for q in self.qs:
+                Z_input = Input(shape=(1,))
+                embed = Embedding(q, self.Z_embed_dim, input_length=1)(Z_input)
+                embed = Reshape(target_shape=(self.Z_embed_dim,))(embed)
+                Z_inputs.append(Z_input)
+                embeds.append(embed)
+            concat = Concatenate()([X_input] + embeds)
+            input_dim = p + self.Z_embed_dim * len(self.qs)
+        z = add_layers_functional(concat, n_neurons, dropout, activation, input_dim)
         codings_mean = Dense(d)(z)
         codings_log_var = Dense(d)(z)
         codings = Sampling()([codings_mean, codings_log_var])
         self.variational_encoder = Model(
-            inputs=[inputs], outputs=[codings_mean, codings_log_var, codings])
+            inputs=[X_input] + Z_inputs, outputs=[codings_mean, codings_log_var, codings])
 
         decoder_inputs = Input(shape=d)
         n_neurons_rev = None if n_neurons is None else list(reversed(n_neurons))
@@ -95,9 +114,9 @@ class VAE:
         self.variational_decoder = Model(
             inputs=[decoder_inputs], outputs=[outputs])
 
-        _, _, codings = self.variational_encoder(inputs)
+        _, _, codings = self.variational_encoder([X_input] + Z_inputs)
         reconstructions = self.variational_decoder(codings)
-        self.variational_ae = Model(inputs=[inputs], outputs=[reconstructions])
+        self.variational_ae = Model(inputs=[X_input] + Z_inputs, outputs=[reconstructions])
 
         # this is the KL loss, we can either subclass our own VAE class, define the
         # squared loss then do "total_loss = reconstruction_loss + kl_loss"
@@ -108,11 +127,17 @@ class VAE:
             K.exp(codings_log_var) - K.square(codings_mean),
             axis=-1)
         self.variational_ae.add_loss(beta * K.mean(kl_loss))
-        self.variational_ae.add_loss(MeanSquaredError()(inputs, reconstructions))
+        self.variational_ae.add_loss(MeanSquaredError()(X_input, reconstructions))
         self.variational_ae.compile(optimizer='adam')
 
     def _fit(self, X):
-        self.history = self.variational_ae.fit(X, X, epochs=self.epochs,
+        if self.embed_RE:
+            X_inputs = [X[self.x_cols].copy()]
+            Z_inputs = [X[RE_col].copy() for RE_col in self.RE_cols]
+        else:
+            X_inputs = [X]
+            Z_inputs = []
+        self.history = self.variational_ae.fit(X_inputs + Z_inputs, X_inputs, epochs=self.epochs,
                                                callbacks=self.callbacks, batch_size=self.batch_size,
                                                validation_split=0.1, verbose=self.verbose)
         gc.collect()
@@ -122,7 +147,13 @@ class VAE:
         return self
 
     def _transform(self, X):
-        _, _, X_transformed = self.variational_encoder.predict(X, verbose=0)
+        if self.embed_RE:
+            X_inputs = [X[self.x_cols].copy()]
+            Z_inputs = [X[RE_col].copy() for RE_col in self.RE_cols]
+        else:
+            X_inputs = [X]
+            Z_inputs = []
+        _, _, X_transformed = self.variational_encoder.predict(X_inputs + Z_inputs, verbose=0)
         return X_transformed
 
     def transform(self, X):

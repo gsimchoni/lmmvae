@@ -52,16 +52,22 @@ def run_lmmpca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, to
     return X_reconstructed_te, [pca.sig2e_est, [sig2bs_mean_est], none_sigmas_spatial], pca.n_iter
 
 
-def run_vae(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial,
-               x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
-               mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False):
+def run_vae(X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
+            x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
+            mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False, embed_RE=False):
+    RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode)
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
-    else:
+        p = X_train.shape[1]
+    elif not embed_RE:
         X_train, X_test = process_one_hot_encoding(
             X_train, X_test, x_cols, RE_cols_prefix, mode)
-    vae = VAE(X_train.shape[1], d, batch_size, epochs, patience, n_neurons,
-              dropout, activation, beta, pred_unknown_clusters, verbose)
+        p = X_train.shape[1]
+    else:
+        p = len(x_cols)
+
+    vae = VAE(p, d, batch_size, epochs, patience, n_neurons, dropout, activation,
+            beta, pred_unknown_clusters, embed_RE, qs, x_cols, RE_cols, verbose)
 
     # scaler = StandardScaler()
     # X_train = scaler.fit_transform(X_train)
@@ -211,12 +217,16 @@ def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, thresh, epochs, qs[0])
     elif dr_type == 'vae-ignore':
         X_reconstructed_te, sigmas, n_epochs = run_vae(
-            X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
+            X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=True)
     elif dr_type == 'vae-ohe':
         X_reconstructed_te, sigmas, n_epochs = run_vae(
-            X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, x_cols, batch_size,
+            X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False)
+    elif dr_type == 'vae-embed':
+        X_reconstructed_te, sigmas, n_epochs = run_vae(
+            X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
+            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, embed_RE=True)
     elif dr_type == 'lmmvae':
         X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,

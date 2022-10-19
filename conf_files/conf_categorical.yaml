@@ -27,6 +27,8 @@ q_spatial_list: []
 latent_dimension_list:
   - 1
   - 2
+beta_list:
+  - 0.001
 N_list:
   - 100000
 n_iter: 3
@@ -51,6 +53,7 @@ RE_cols_prefix: 'z'
 dr_types:
   - 'pca-ignore'
   - 'pca-ohe'
-  - 'vae-ohe'
   - 'vae-ignore'
+  - 'vae-ohe'
+  - 'vae-embed'
   - 'lmmvae'
