@@ -9,10 +9,10 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 
 from lmmvae.pca import LMMPCA
-from lmmvae.utils import DRResult, get_RE_cols_by_prefix, get_aux_cols, verify_q, \
+from lmmvae.utils import DRResult, get_RE_cols_by_prefix, get_aux_cols, process_X_to_rnn, verify_q, \
     process_data_for_svgpvae, process_one_hot_encoding, verify_M, verify_RE_cols, \
-        decrease_spatial_resolution
-from lmmvae.vae import LMMVAE, VAE
+        decrease_spatial_resolution, invert_rnn_to_X
+from lmmvae.vae import LMMVAE, VAE, VRAE
 from svgpvae.gpvae import SVGPVAE
 
 
@@ -78,6 +78,41 @@ def run_vae(X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
     X_reconstructed_te = vae.reconstruct(X_transformed_te)
 
     n_epochs = len(vae.get_history().history['loss'])
+    none_sigmas = [None for _ in range(n_sig2bs)]
+    none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
+    return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], n_epochs
+
+
+def run_vrae(X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
+            x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
+            mode, n_sig2bs, beta, pred_unknown_clusters, time2measure_dict, verbose):
+    x_cols = [col for col in x_cols if col != 't']
+    RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode)
+    scaler = StandardScaler()
+    X_train_x_cols = pd.DataFrame(scaler.fit_transform(X_train[x_cols]), index=X_train.index, columns=x_cols)
+    X_train = pd.concat([X_train_x_cols, X_train[RE_cols]], axis=1)
+    X_test_x_cols = pd.DataFrame(scaler.transform(X_test[x_cols]), index=X_test.index, columns=x_cols)
+    X_test = pd.concat([X_test_x_cols, X_test[RE_cols]], axis=1)
+    x_cols.append('t')
+
+    X_train_rnn, _, _, _ = process_X_to_rnn(X_train, time2measure_dict, x_cols)
+    X_test_rnn, fill_cols, pivot_cols, delete_rows = process_X_to_rnn(X_test, time2measure_dict, x_cols)
+    p = len(x_cols)
+    nt = len(time2measure_dict)
+    if nt < 100:
+        n_lstm_cells = 100
+    else:
+        n_lstm_cells = 10
+
+    vrae = VRAE(p, nt, 100, batch_size, epochs, patience, n_lstm_cells, dropout, activation,
+            beta, pred_unknown_clusters, verbose)
+
+    X_transformed_tr = vrae.fit_transform(X_train_rnn)
+    X_reconstructed_te = vrae.predict(X_test_rnn)
+    X_reconstructed_te = invert_rnn_to_X(X_reconstructed_te, time2measure_dict, x_cols, fill_cols, pivot_cols, delete_rows)
+    X_reconstructed_te = scaler.inverse_transform(X_reconstructed_te[:, :(p-1)])
+
+    n_epochs = len(vrae.get_history().history['loss'])
     none_sigmas = [None for _ in range(n_sig2bs)]
     none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
     return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], n_epochs
@@ -199,11 +234,11 @@ def run_gppvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2
     pass
 
 
-def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
+def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             thresh, epochs, qs, q_spatial, n_sig2bs, n_sig2bs_spatial,
             est_cors, batch_size, patience, n_neurons, n_neurons_re, dropout,
             activation, mode, beta, re_prior, kernel, pred_unknown_clusters,
-            max_spatial_locs, verbose, U, B_list):
+            max_spatial_locs, time2measure_dict, verbose, U, B_list):
     gc.collect()
     start = time.time()
     if dr_type == 'pca-ignore':
@@ -227,6 +262,10 @@ def reg_dr(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
         X_reconstructed_te, sigmas, n_epochs = run_vae(
             X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, embed_RE=True)
+    elif dr_type == 'vrae':
+        X_reconstructed_te, sigmas, n_epochs = run_vrae(
+            X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
+            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, time2measure_dict, verbose)
     elif dr_type == 'lmmvae':
         X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,

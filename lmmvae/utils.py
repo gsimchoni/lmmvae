@@ -13,7 +13,7 @@ DRResult = namedtuple(
     'PCAResult', ['metric_X', 'sigmas', 'rhos', 'n_epochs', 'time'])
 
 Data = namedtuple('PCAData', [
-    'X_train', 'X_test', 'W', 'U', 'B_list', 'x_cols', 'kernel'
+    'X_train', 'X_test', 'W', 'U', 'B_list', 'x_cols', 'kernel', 'time2measure_dict'
 ])
 
 DRInput = namedtuple('PCAInput',
@@ -206,6 +206,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     e = np.random.normal(scale=np.sqrt(sig2e), size=n * p).reshape(n, p)
     UW = U @ W.T
     kernel_root = None
+    time2measure_dict = None
     if params['X_non_linear']:
         fU = (U[:,None,:]*W[None,:,:]*np.cos(U[:,None,:]*W[None,:,:])).sum(axis=2)
     else:
@@ -341,6 +342,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         x_cols.extend(co_cols)
     if mode == 'longitudinal':
         df['t'] = t
+        time2measure_dict = {t: i for i, t in enumerate(np.sort(df['t'].unique()))}
         x_cols.append('t')
         pred_future = params.get('longitudinal_predict_future', False)
         if pred_future:
@@ -364,7 +366,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     X_train = X_train.sort_index()
     X_test = X_test.sort_index()
     U_train = U[X_train.index]
-    return Data(X_train, X_test, W, U_train, B_list, x_cols, kernel_root)
+    return Data(X_train, X_test, W, U_train, B_list, x_cols, kernel_root, time2measure_dict)
 
 
 def verify_M(x_cols, M, RE_cols, aux_cols):
@@ -381,3 +383,27 @@ def verify_M(x_cols, M, RE_cols, aux_cols):
 def verify_RE_cols(mode, RE_cols):
     if mode == 'spatial_and_categorical' and len(RE_cols) > 1:
         return RE_cols[1:]
+    return RE_cols
+
+
+def process_X_to_rnn(X, time2measure_dict, x_cols):
+    X = X.copy()
+    X['measure'] = X['t'].map(time2measure_dict)
+    X_rnn2 = X.pivot(index='z0', columns=['measure'], values = x_cols).fillna(0)
+    pivot_cols = X_rnn2.columns
+    X_rnn_melted = X_rnn2.stack()
+    delete_rows = np.where((X_rnn_melted==0).all(axis=1))[0]
+    X_rnn = X_rnn2.reindex(columns=pd.MultiIndex.from_product([x_cols, time2measure_dict.values()]), fill_value=0)
+    fill_cols = [X_rnn.columns.get_loc(col) for col in X_rnn.columns.difference(X_rnn2.columns)]
+    X_rnn = X_rnn.values.reshape(-1,len(x_cols),len(time2measure_dict)).transpose([0,2,1])
+    return X_rnn, fill_cols, pivot_cols, delete_rows
+
+def invert_rnn_to_X(X_rnn, time2measure_dict, x_cols, fill_cols, pivot_cols, delete_rows):
+    X = X_rnn.transpose([0,2,1]).reshape(-1, len(x_cols) * len(time2measure_dict))
+    X = np.delete(X, fill_cols, axis=1)
+    X = pd.DataFrame(X, columns=pivot_cols)
+    X = X.stack()
+    X.index = np.arange(X.shape[0])
+    # X = X.loc[~(X==0).all(axis=1)] # only for real data
+    X = X.drop(delete_rows, axis=0)
+    return X.values

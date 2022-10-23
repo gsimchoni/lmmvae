@@ -29,13 +29,14 @@ q_list:
   -
     - 100
     - 1000
+    - 10000
 q_spatial_list: []
 latent_dimension_list:
   - 1
   - 2
 N_list:
   - 100000
-n_iter: 3
+n_iter: 5
 n_per_cat: 3
 fixed_intercept: 1
 n_fixed_features: 100
@@ -59,5 +60,6 @@ dr_types:
   - 'pca-ohe'
   - 'vae-ignore'
   - 'vae-ohe'
+  - 'vrae'
   - 'lmmvae'
   - 'svgpvae-10-16-2'

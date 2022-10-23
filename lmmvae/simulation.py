@@ -4,12 +4,12 @@ from itertools import product
 
 import pandas as pd
 
-from lmmvae.dim_reduction import reg_dr
+from lmmvae.dim_reduction import run_dim_reduction
 from lmmvae.utils import DRInput, generate_data
 
 logger = logging.getLogger('LMMVAE.logger')
 os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
-
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1" # uncomment to disable gpu
 
 class Count:
     curr = 0
@@ -36,14 +36,15 @@ def iterate_dr_types(counter, res_df, out_file, dr_in, dr_types, verbose):
 
 
 def run_dr(dr_in, dr_type):
-    return reg_dr(dr_in.X_train, dr_in.X_test, dr_in.x_cols,
+    return run_dim_reduction(dr_in.X_train, dr_in.X_test, dr_in.x_cols,
                 dr_in.RE_cols_prefix, dr_in.d, dr_type, dr_in.thresh,
                 dr_in.epochs, dr_in.qs, dr_in.q_spatial, dr_in.n_sig2bs,
                 dr_in.n_sig2bs_spatial, dr_in.estimated_cors, dr_in.batch_size,
                 dr_in.patience, dr_in.n_neurons, dr_in.n_neurons_re, dr_in.dropout,
                 dr_in.activation, dr_in.mode, dr_in.beta, dr_in.re_prior,
                 dr_in.kernel, dr_in.pred_unknown_clusters,
-                dr_in.max_spatial_locs, dr_in.verbose, dr_in.U, dr_in.B_list)
+                dr_in.max_spatial_locs, dr_in.time2measure_dict, dr_in.verbose,
+                dr_in.U, dr_in.B_list)
 
 
 def summarize_sim(dr_in, res, dr_type):

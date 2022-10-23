@@ -9,7 +9,7 @@ from packaging import version
 from sklearn.utils.validation import check_is_fitted
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.layers import Concatenate, Dense, Dropout, Input, Layer, Embedding, Reshape
+from tensorflow.keras.layers import Concatenate, Dense, Dropout, Input, Layer, Embedding, Reshape, Masking, LSTM, RepeatVector, TimeDistributed
 from tensorflow.keras.layers.experimental.preprocessing import CategoryEncoding
 from tensorflow.keras.losses import MeanSquaredError
 from tensorflow.keras.models import Model
@@ -166,6 +166,90 @@ class VAE:
     
     def reconstruct(self, X_transformed):
         X_reconstructed = self.variational_decoder.predict([X_transformed], verbose=0)
+        return X_reconstructed
+
+    def get_history(self):
+        check_is_fitted(self, 'history')
+        return self.history
+
+
+class VRAE:
+    """VRAE Class
+
+    """
+
+    def __init__(self, p, nt, d, batch_size, epochs, patience, n_lstm_cells,
+                 dropout, activation, beta, pred_unknown_clusters, verbose) -> None:
+        super().__init__()
+        self.batch_size = batch_size
+        self.epochs = epochs
+        self.patience = patience
+        self.verbose = verbose
+        self.pred_unknown_clusters = pred_unknown_clusters
+        self.history = None
+        self.callbacks = [EarlyStopping(monitor='val_loss',
+                                        patience=self.epochs if patience is None else patience)]
+        X_input = Input(shape=(nt, p))
+        z = Masking(mask_value=.0)(X_input)
+        z, h, c = LSTM(n_lstm_cells, return_state=True)(z)
+        codings_mean = Dense(d)(z)
+        codings_log_var = Dense(d)(z)
+        codings = Sampling()([codings_mean, codings_log_var])
+        self.variational_encoder = Model(
+            inputs=[X_input], outputs=[codings_mean, codings_log_var, codings, h, c])
+
+        decoder_inputs = Input(shape=d)
+        latent_repeat = RepeatVector(nt)(decoder_inputs)
+        h = Input(shape=(n_lstm_cells, ), name='encoder_state_h')
+        c = Input(shape=(n_lstm_cells, ), name='encoder_state_c')
+        decoder_lstm = LSTM(n_lstm_cells, return_sequences=True)
+        decoder_dense = TimeDistributed(Dense(p))
+        x = decoder_lstm(latent_repeat, initial_state=[h, c])
+
+        outputs = decoder_dense(x)
+        self.internal_decoder = Model(
+            inputs=[decoder_inputs, h, c], outputs=[outputs])
+
+        _, _, codings, h_decoded, c_decoded = self.variational_encoder([X_input])
+        reconstructions = self.internal_decoder([codings, h_decoded, c_decoded])
+        self.variational_ae = Model(inputs=[X_input], outputs=[reconstructions])
+
+        kl_loss = -0.5 * K.sum(
+            1 + codings_log_var -
+            K.exp(codings_log_var) - K.square(codings_mean),
+            axis=-1)
+        self.variational_ae.add_loss(beta * K.mean(kl_loss))
+        self.variational_ae.add_loss(MeanSquaredError()(X_input, reconstructions))
+        self.variational_ae.compile(optimizer='adam')
+
+    def _fit(self, X):
+        self.history = self.variational_ae.fit(X, X, epochs=self.epochs,
+                                               callbacks=self.callbacks, batch_size=self.batch_size,
+                                               validation_split=0.1, verbose=self.verbose)
+        gc.collect()
+
+    def fit(self, X):
+        self._fit(X)
+        return self
+
+    def _transform(self, X):
+        _, _, X_transformed, _, _ = self.variational_encoder.predict(X, verbose=0)
+        return X_transformed
+
+    def transform(self, X):
+        check_is_fitted(self, 'history')
+        return self._transform(X)
+
+    def fit_transform(self, X):
+        self._fit(X)
+        return self._transform(X)
+    
+    def reconstruct(self, X_transformed):
+        X_reconstructed = self.variational_decoder.predict([X_transformed], verbose=0)
+        return X_reconstructed
+    
+    def predict(self, X):
+        X_reconstructed = self.variational_ae.predict([X], verbose=0)
         return X_reconstructed
 
     def get_history(self):
