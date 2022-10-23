@@ -46,7 +46,7 @@ class SVGPVAE:
         ip_joint=True
         GP_joint=True
         ov_joint=True
-        lr_arg=0.001
+        lr_arg=0.0001
         alpha_arg=0.99
         jitter=0.000001
         object_kernel_normalize=False
@@ -325,16 +325,17 @@ class SVGPVAE:
                     print("Conditional generation MSE loss on test set for epoch {}: {}".format(epoch, recon_loss_cgen))
             
                 # LV generation:
-                X_transformed_tr_ = sess.run(X_transformed_tr,
-                    {train_data_Y_placeholder: train_data_dict['data_Y'],
-                    train_aux_X_placeholder: train_data_dict['aux_X']})
-                X_transformed_te_ = sess.run(X_transformed_te,
-                    {test_data_Y_placeholder: test_data_dict['data_Y'],
-                    test_aux_X_placeholder: test_data_dict['aux_X']})
+                # X_transformed_tr_ = sess.run(X_transformed_tr,
+                #     {train_data_Y_placeholder: train_data_dict['data_Y'],
+                #     train_aux_X_placeholder: train_data_dict['aux_X']})
+                # X_transformed_te_ = sess.run(X_transformed_te,
+                #     {test_data_Y_placeholder: test_data_dict['data_Y'],
+                #     test_aux_X_placeholder: test_data_dict['aux_X']})
             
 
         self.n_epochs = epoch
-        return X_transformed_tr_, X_transformed_te_, recon_data_Y_cgen
+        # return X_transformed_tr_, X_transformed_te_, recon_data_Y_cgen
+        return recon_data_Y_cgen
 
     def get_n_epochs(self):
         return self.n_epochs

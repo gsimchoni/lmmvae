@@ -177,7 +177,8 @@ def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig
     X_train_new, X_valid = train_test_split(X_train, test_size=0.1)
     train_data_dict, valid_data_dict, test_data_dict = process_data_for_svgpvae(
         X_train_new, X_test, X_valid, x_cols, aux_cols, RE_cols, M)
-    X_transformed_tr, X_transformed_te, X_reconstructed_te = svgpvae.run(train_data_dict, valid_data_dict, test_data_dict)
+    # X_transformed_tr, X_transformed_te, X_reconstructed_te = svgpvae.run(train_data_dict, valid_data_dict, test_data_dict)
+    X_reconstructed_te = svgpvae.run(train_data_dict, valid_data_dict, test_data_dict)
 
     if scale:
         X_reconstructed_te = scaler.inverse_transform(X_reconstructed_te)

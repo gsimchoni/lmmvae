@@ -48,8 +48,8 @@ activation: 'relu'
 X_non_linear: True
 Z_non_linear: False
 batch_size: 1000
-epochs: 1000
-patience: 10
+epochs: 200
+patience:
 verbose: False
 log_params: False
 test_size: 0.2
