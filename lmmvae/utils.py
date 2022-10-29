@@ -309,8 +309,9 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         A = a.reshape(K * qs[0], p, order='F')
         M = np.zeros((K * qs[0], p))
         D_root = np.linalg.cholesky(D)
+        kernel = np.kron(cov_mat, np.eye(qs[0]))
         try:
-            kernel_root = np.linalg.cholesky(np.kron(cov_mat, np.eye(qs[0])))
+            kernel_root = np.linalg.cholesky(kernel)
         except:
             jitter = 1e-05
             kernel_root = np.linalg.cholesky(kernel + jitter * np.eye(kernel.shape[0]))
