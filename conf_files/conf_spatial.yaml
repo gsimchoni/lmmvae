@@ -21,7 +21,7 @@ latent_dimension_list:
 beta_list:
   - 0.001
 N_list:
-  - 10000
+  - 100000
 n_iter: 3
 n_per_cat: 3
 fixed_intercept: 1
@@ -34,7 +34,7 @@ activation: 'relu'
 X_non_linear: True
 Z_non_linear: False
 batch_size: 1000
-epochs: 1000
+epochs: 200
 patience:
 verbose: False
 log_params: False
@@ -44,6 +44,10 @@ RE_cols_prefix: 'z'
 pred_unknown_clusters: False
 max_spatial_locs: 100
 dr_types:
+  - 'pca-ignore'
+  - 'pca-ohe'
+  - 'vae-ignore'
+  - 'vae-ohe'
+  - 'vae-embed'
   - 'lmmvae'
-  - 'lmmvae-sfc'
   - 'svgpvae-10-16-2'
