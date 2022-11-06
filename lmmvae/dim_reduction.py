@@ -262,6 +262,8 @@ def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
     elif dr_type == 'vae-embed':
         if mode == 'spatial2':
             qs = [q_spatial]
+        if mode == 'spatial_and_categorical':
+            qs = [q for q in qs] + [q_spatial]
         X_reconstructed_te, sigmas, n_epochs = run_vae(
             X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, embed_RE=True)

@@ -55,5 +55,6 @@ dr_types:
   - 'pca-ohe'
   - 'vae-ignore'
   - 'vae-ohe'
+  - 'vae-embed'
   - 'lmmvae'
   - 'lmmvae-sfc'
