@@ -428,8 +428,8 @@ class LMMVAE:
         Z_inputs = [X[RE_col].copy() for RE_col in self.RE_cols]
         if self.pred_unknown_clusters:
             Z_inputs_train, Z_inputs_valid = train_test_split(Z_inputs[0].unique(), test_size=0.1)
-            Z_inputs_train = [Z_inputs[0][Z_inputs[0].isin(Z_inputs_train)]]
-            Z_inputs_valid = [Z_inputs[0][Z_inputs[0].isin(Z_inputs_valid)]]
+            Z_inputs_train = [Z_input[Z_inputs[0].isin(Z_inputs_train)] for Z_input in Z_inputs]
+            Z_inputs_valid =  [Z_input[Z_inputs[0].isin(Z_inputs_valid)] for Z_input in Z_inputs]
             X_input_train = X_input.loc[Z_inputs_train[0].index]
             X_input_valid = X_input.loc[Z_inputs_valid[0].index]
             X_train = X.loc[Z_inputs_train[0].index]
