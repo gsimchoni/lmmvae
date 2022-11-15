@@ -7,6 +7,7 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import mean_squared_error as mse
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
 
 from lmmvae.pca import LMMPCA
 from lmmvae.utils import DRResult, get_RE_cols_by_prefix, get_aux_cols, process_X_to_rnn, verify_q, \
@@ -16,7 +17,7 @@ from lmmvae.vae import LMMVAE, VAE, VRAE
 from svgpvae.gpvae import SVGPVAE
 
 
-def run_pca_ohe_or_ignore(X_train, X_test, x_cols,
+def run_pca_ohe_or_ignore(X_train, X_test, y_train, y_test, x_cols,
     RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose, ignore_RE=False):
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
@@ -34,9 +35,12 @@ def run_pca_ohe_or_ignore(X_train, X_test, x_cols,
     X_reconstructed_te = pca.inverse_transform(X_transformed_te)
     X_reconstructed_te = scaler.inverse_transform(X_reconstructed_te)
 
+    lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
+    y_pred = lm_fit.predict(X_transformed_te)
+
     none_sigmas = [None for _ in range(n_sig2bs)]
     none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
-    return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], None
+    return X_reconstructed_te, y_pred, [None, none_sigmas, none_sigmas_spatial], None
 
 
 def run_lmmpca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, tolerance, max_it, cardinality):
@@ -52,7 +56,7 @@ def run_lmmpca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, to
     return X_reconstructed_te, [pca.sig2e_est, [sig2bs_mean_est], none_sigmas_spatial], pca.n_iter
 
 
-def run_vae(X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
+def run_vae(X_train, X_test, y_train, y_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
             x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
             mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False, embed_RE=False):
     RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode)
@@ -77,13 +81,16 @@ def run_vae(X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
     X_transformed_te = vae.transform(X_test)
     X_reconstructed_te = vae.reconstruct(X_transformed_te)
 
+    lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
+    y_pred = lm_fit.predict(X_transformed_te)
+
     n_epochs = len(vae.get_history().history['loss'])
     none_sigmas = [None for _ in range(n_sig2bs)]
     none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
-    return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], n_epochs
+    return X_reconstructed_te, y_pred, [None, none_sigmas, none_sigmas_spatial], n_epochs
 
 
-def run_vrae(X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
+def run_vrae(X_train, X_test, y_train, y_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
             x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
             mode, n_sig2bs, beta, pred_unknown_clusters, time2measure_dict, verbose):
     x_cols = [col for col in x_cols if col != 't']
@@ -112,13 +119,16 @@ def run_vrae(X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
     X_reconstructed_te = invert_rnn_to_X(X_reconstructed_te, time2measure_dict, x_cols, fill_cols, pivot_cols, delete_rows)
     X_reconstructed_te = scaler.inverse_transform(X_reconstructed_te[:, :(p-1)])
 
+    lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
+    y_pred = None #lm_fit.predict(X_transformed_te)
+
     n_epochs = len(vrae.get_history().history['loss'])
     none_sigmas = [None for _ in range(n_sig2bs)]
     none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
-    return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], n_epochs
+    return X_reconstructed_te, y_pred, [None, none_sigmas, none_sigmas_spatial], n_epochs
 
 
-def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
+def run_lmmvae(X_train, X_test, y_train, y_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
                epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel_root, pred_unknown_clusters,
                max_spatial_locs, verbose, U, B_list):
     RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode)
@@ -142,6 +152,9 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
     X_reconstructed_te = lmmvae.reconstruct(X_transformed_te, X_test[RE_cols], B_hat_list)
     # X_reconstructed_te = scaler.inverse_transform(X_reconstructed_te)
 
+    lm_fit = LinearRegression().fit(X_transformed_tr, y_train)
+    y_pred = lm_fit.predict(X_transformed_te)
+
     n_epochs = len(lmmvae.get_history().history['loss'])
     sig2bs_mean_est = [np.mean(sig2bs) for sig2bs in sig2bs_hat_list]
     sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
@@ -152,7 +165,7 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
             sig2bs_mean_est = sig2bs_mean_est[1:]
         else:
             sig2bs_mean_est = []
-    return X_reconstructed_te, [None, sig2bs_mean_est, sigmas_spatial], n_epochs
+    return X_reconstructed_te, y_pred, [None, sig2bs_mean_est, sigmas_spatial], n_epochs
 
 
 def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, mode,
@@ -235,7 +248,7 @@ def run_gppvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2
     pass
 
 
-def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
+def run_dim_reduction(X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, dr_type,
             thresh, epochs, qs, q_spatial, n_sig2bs, n_sig2bs_spatial,
             est_cors, batch_size, patience, n_neurons, n_neurons_re, dropout,
             activation, mode, beta, re_prior, kernel, pred_unknown_clusters,
@@ -243,53 +256,53 @@ def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
     gc.collect()
     start = time.time()
     if dr_type == 'pca-ignore':
-        X_reconstructed_te, sigmas, n_epochs = run_pca_ohe_or_ignore(
-            X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose, ignore_RE=True)
+        X_reconstructed_te, y_pred, sigmas, n_epochs = run_pca_ohe_or_ignore(
+            X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose, ignore_RE=True)
     elif dr_type == 'pca-ohe':
-        X_reconstructed_te, sigmas, n_epochs = run_pca_ohe_or_ignore(
-            X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose)
+        X_reconstructed_te, y_pred, sigmas, n_epochs = run_pca_ohe_or_ignore(
+            X_train, X_test, y_train, y_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose)
     elif dr_type == 'lmmpca':
         sigmas, n_epochs = run_lmmpca(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, thresh, epochs, qs[0])
     elif dr_type == 'vae-ignore':
-        X_reconstructed_te, sigmas, n_epochs = run_vae(
-            X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
+        X_reconstructed_te, y_pred, sigmas, n_epochs = run_vae(
+            X_train, X_test, y_train, y_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=True)
     elif dr_type == 'vae-ohe':
-        X_reconstructed_te, sigmas, n_epochs = run_vae(
-            X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
+        X_reconstructed_te, y_pred, sigmas, n_epochs = run_vae(
+            X_train, X_test, y_train, y_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False)
     elif dr_type == 'vae-embed':
         if mode == 'spatial2':
             qs = [q_spatial]
         if mode == 'spatial_and_categorical':
             qs = [q for q in qs] + [q_spatial]
-        X_reconstructed_te, sigmas, n_epochs = run_vae(
-            X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
+        X_reconstructed_te, y_pred, sigmas, n_epochs = run_vae(
+            X_train, X_test, y_train, y_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, embed_RE=True)
     elif dr_type == 'vrae':
-        X_reconstructed_te, sigmas, n_epochs = run_vrae(
-            X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
+        X_reconstructed_te, y_pred, sigmas, n_epochs = run_vrae(
+            X_train, X_test, y_train, y_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, time2measure_dict, verbose)
     elif dr_type == 'lmmvae':
-        X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
-            X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
+        X_reconstructed_te, y_pred, sigmas, n_epochs = run_lmmvae(
+            X_train, X_test, y_train, y_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, pred_unknown_clusters,
             max_spatial_locs, verbose, U, B_list)
     elif dr_type == 'lmmvae-sfc':
-        X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
-            X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
+        X_reconstructed_te, y_pred, sigmas, n_epochs = run_lmmvae(
+            X_train, X_test, y_train, y_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, 'spatial_fit_categorical', beta, kernel, pred_unknown_clusters,
             max_spatial_locs, verbose, U, B_list)
     elif dr_type.startswith('svgpvae'):
         dr_type_split = dr_type.split('-')
         M, nr_inducing_points, nr_inducing_per_unit = int(dr_type_split[1]), int(dr_type_split[2]), int(dr_type_split[3])
-        X_reconstructed_te, sigmas, n_epochs = run_svgpvae(
+        X_reconstructed_te, y_pred, sigmas, n_epochs = run_svgpvae(
             X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, mode, batch_size,
             epochs, patience, n_neurons, dropout, activation, beta, M=M, nr_inducing_points=nr_inducing_points,
             nr_inducing_per_unit=nr_inducing_per_unit, verbose=verbose)
     elif dr_type == 'gppvae':
-        X_reconstructed_te, sigmas, n_epochs = run_gppvae(
+        X_reconstructed_te, y_pred, sigmas, n_epochs = run_gppvae(
             X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, mode, batch_size,
             epochs, patience, n_neurons, dropout, activation, verbose)
     else:
@@ -299,7 +312,9 @@ def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
         x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2', 't']]
     try:
         metric_X = mse(X_test[x_cols].values, X_reconstructed_te[:, :len(x_cols)])
+        metric_Y = mse(y_test, y_pred)
     except:
         metric_X = np.nan
+        metric_Y = np.nan
     none_rhos = [None for _ in range(len(est_cors))]
-    return DRResult(metric_X, sigmas, none_rhos, n_epochs, end - start)
+    return DRResult(metric_X, metric_Y, sigmas, none_rhos, n_epochs, end - start)

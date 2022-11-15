@@ -36,7 +36,7 @@ def iterate_dr_types(counter, res_df, out_file, dr_in, dr_types, verbose):
 
 
 def run_dr(dr_in, dr_type):
-    return run_dim_reduction(dr_in.X_train, dr_in.X_test, dr_in.x_cols,
+    return run_dim_reduction(dr_in.X_train, dr_in.X_test, dr_in.y_train, dr_in.y_test, dr_in.x_cols,
                 dr_in.RE_cols_prefix, dr_in.d, dr_type, dr_in.thresh,
                 dr_in.epochs, dr_in.qs, dr_in.q_spatial, dr_in.n_sig2bs,
                 dr_in.n_sig2bs_spatial, dr_in.estimated_cors, dr_in.batch_size,
@@ -55,7 +55,7 @@ def summarize_sim(dr_in, res, dr_type):
     res = [dr_in.mode, dr_in.N, dr_in.p, dr_in.d, dr_in.sig2e, dr_in.beta, dr_in.re_prior] + \
         list(dr_in.qs) + q_spatial + list(dr_in.sig2bs_means) + list(dr_in.sig2bs_spatial) + list(dr_in.rhos) + \
         [dr_in.sig2bs_identical, dr_in.thresh, dr_in.k, dr_type,
-        res.metric_X, res.sigmas[0]] + res.sigmas[1] + res.sigmas[2] + res.rhos + [res.n_epochs, res.time]
+        res.metric_X, res.metric_Y, res.sigmas[0]] + res.sigmas[1] + res.sigmas[2] + res.rhos + [res.n_epochs, res.time]
     return res
 
 
@@ -108,7 +108,7 @@ def simulation(out_file, params):
         columns=['mode', 'N', 'p', 'd', 'sig2e', 'beta', 're_prior'] +
         qs_names + q_spatial_name + sig2bs_names +
         sig2bs_spatial_names + rhos_names + ['sig2bs_identical', 'thresh'] +
-        ['experiment', 'exp_type', 'mse_X', 'sig2e_est'] + sig2bs_est_names +
+        ['experiment', 'exp_type', 'mse_X', 'mse_Y', 'sig2e_est'] + sig2bs_est_names +
         sig2bs_spatial_est_names + rhos_est_names + ['n_epochs', 'time'])
     for N in params['N_list']:
         for sig2e in params['sig2e_list']:

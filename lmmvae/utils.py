@@ -10,10 +10,10 @@ from scipy.spatial.distance import pdist, squareform
 
 
 DRResult = namedtuple(
-    'PCAResult', ['metric_X', 'sigmas', 'rhos', 'n_epochs', 'time'])
+    'PCAResult', ['metric_X', 'metric_Y', 'sigmas', 'rhos', 'n_epochs', 'time'])
 
 Data = namedtuple('PCAData', [
-    'X_train', 'X_test', 'W', 'U', 'B_list', 'x_cols', 'kernel', 'time2measure_dict'
+    'X_train', 'X_test', 'y_train', 'y_test', 'W', 'U', 'B_list', 'x_cols', 'kernel', 'time2measure_dict'
 ])
 
 DRInput = namedtuple('PCAInput',
@@ -205,6 +205,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     mu = np.random.uniform(-10, 10, size=p)#np.zeros(p)
     e = np.random.normal(scale=np.sqrt(sig2e), size=n * p).reshape(n, p)
     UW = U @ W.T
+    y = U @ np.ones(d)
     kernel_root = None
     time2measure_dict = None
     if params['X_non_linear']:
@@ -367,7 +368,8 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     X_train = X_train.sort_index()
     X_test = X_test.sort_index()
     U_train = U[X_train.index]
-    return Data(X_train, X_test, W, U_train, B_list, x_cols, kernel_root, time2measure_dict)
+    y_train, y_test = y[X_train.index], y[X_test.index]
+    return Data(X_train, X_test, y_train, y_test, W, U_train, B_list, x_cols, kernel_root, time2measure_dict)
 
 
 def verify_M(x_cols, M, RE_cols, aux_cols):
