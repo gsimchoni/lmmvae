@@ -44,14 +44,24 @@ p_scatter_B3 <- B %>%
   theme_bw() +
   theme(aspect.ratio=1, text = element_text(family = "Century", size=16))
 
-p_scatter_U <- U %>%
-  ggplot(aes(u_true, u_pred)) +
+p_scatter_U1 <- U %>%
+  ggplot(aes(U0_true, U0_pred)) +
   geom_point(alpha = 0.2) +
-  labs(x = "True LV", y = "Predicted LV") +
+  labs(x = "", y = "Predicted LV") +
   # xlim(-1, 1) +
   # ylim(-1, 1) +
   theme_bw() +
   theme(aspect.ratio=1, text = element_text(family = "Century", size=16))
+
+p_scatter_U2 <- U %>%
+  ggplot(aes(U1_true, U1_pred)) +
+  geom_point(alpha = 0.2) +
+  labs(x = "", y = "") +
+  # xlim(-1, 1) +
+  # ylim(-1, 1) +
+  theme_bw() +
+  theme(aspect.ratio = 1,
+        text = element_text(family = "Century", size = 16))
 
 p_scatter_X1 <- X %>%
   ggplot(aes(X0, X0_pred)) +
@@ -65,11 +75,11 @@ p_scatter_X1 <- X %>%
 p_scatter_X2 <- X %>%
   ggplot(aes(X1, X1_pred)) +
   geom_point(alpha = 0.2) +
-  labs(x = "True X", y = "") +
+  labs(x = "True X", y = "", title="True LV") +
   # xlim(-1, 1) +
   # ylim(-1, 1) +
   theme_bw() +
-  theme(aspect.ratio=1, text = element_text(family = "Century", size=16))
+  theme(aspect.ratio=1, text = element_text(family = "Century", size=16), plot.title = element_text(size=16, hjust = 0.5, vjust = 8))
 
 p_scatter_X3 <- X %>%
   ggplot(aes(X2, X2_pred)) +
@@ -80,19 +90,19 @@ p_scatter_X3 <- X %>%
   theme_bw() +
   theme(aspect.ratio=1, text = element_text(family = "Century", size=16))
 
-# not working
-# p1 <- (p_scatter_B1 | p_scatter_B2 | p_scatter_B3)
-# p2 <- p_scatter_U
-# p3 <- (p_scatter_X1 | p_scatter_X2 | p_scatter_X3)
-# p <- p1 / p2 / p3
-
 # working
+p1 <- (p_scatter_B1 | p_scatter_B2 | p_scatter_B3)
+p2 <- (p_scatter_U1 | p_scatter_U2)
+p3 <- (p_scatter_X1 | p_scatter_X2 | p_scatter_X3)
+p <- p1 / p2 / p3
+
+# working for 1 LV
 design <- "
   123
   #4#
   567
 "
 
-p <- p_scatter_B1 + p_scatter_B2 + p_scatter_B3 + p_scatter_U + p_scatter_X1 + p_scatter_X2 + p_scatter_X3 + plot_layout(design = design)
+p <- p_scatter_B1 + p_scatter_B2 + p_scatter_B3 + p_scatter_U1 + p_scatter_X1 + p_scatter_X2 + p_scatter_X3 + plot_layout(design = design)
 
 ggsave("images/sim_viz.png", p, device = "png", width = 16, height = 8, dpi = 300)

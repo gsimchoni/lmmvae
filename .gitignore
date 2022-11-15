@@ -134,3 +134,5 @@ dmypy.json
 # res files
 /res*.csv
 .Rproj.user
+.Rhistory
+lmmvae.Rproj
