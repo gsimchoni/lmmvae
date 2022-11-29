@@ -7,6 +7,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from scipy.spatial.distance import pdist, squareform
+from scipy.stats import gaussian_kde
+from sklearn.metrics import pairwise_distances_argmin
 
 
 DRResult = namedtuple(
@@ -164,30 +166,23 @@ def process_X_for_svgpvae(X, x_cols, RE_cols, aux_cols, pca=None, scaler=None, M
 
 def decrease_spatial_resolution(X_train, X_test, max_spatial_locs, lengthscale=1.0):
     X_train, X_test = X_train.copy(), X_test.copy()
-    min_D1_tr, max_D1_tr = X_train['D1'].min(), X_train['D1'].max()
-    min_D2_tr, max_D2_tr = X_train['D2'].min(), X_train['D2'].max()
-    min_D1_te, max_D1_te = X_test['D1'].min(), X_test['D1'].max()
-    min_D2_te, max_D2_te = X_test['D2'].min(), X_test['D2'].max()
-    min_D1, max_D1 = np.min([min_D1_tr, min_D1_te]), np.max([max_D1_tr, max_D1_te])
-    min_D2, max_D2 = np.min([min_D2_tr, min_D2_te]), np.max([max_D2_tr, max_D2_te])
-    D1_ticks = np.concatenate([[-np.inf], np.linspace(min_D1, max_D1, int(np.sqrt(max_spatial_locs)))])
-    D2_ticks = np.concatenate([[-np.inf], np.linspace(min_D2, max_D2, int(np.sqrt(max_spatial_locs)))])
-    X_train['D1'] = pd.cut(X_train['D1'], bins=D1_ticks, labels=D1_ticks[1:])
-    X_train['D2'] = pd.cut(X_train['D2'], bins=D2_ticks, labels=D2_ticks[1:])
-    X_test['D1'] = pd.cut(X_test['D1'], bins=D1_ticks, labels=D1_ticks[1:])
-    X_test['D2'] = pd.cut(X_test['D2'], bins=D2_ticks, labels=D2_ticks[1:])
+
+    kde = gaussian_kde(X_train[['D1', 'D2']].T)
+    new_coords = kde.resample(max_spatial_locs).T
+    labels_train = pairwise_distances_argmin(X_train[['D1', 'D2']], new_coords)
+    labels_test = pairwise_distances_argmin(X_test[['D1', 'D2']], new_coords)
+    X_train['D1'] = new_coords[labels_train][:, 0]
+    X_train['D2'] = new_coords[labels_train][:, 1]
+    X_test['D1'] = new_coords[labels_test][:, 0]
+    X_test['D2'] = new_coords[labels_test][:, 1]
     coords_dict_df = pd.concat([X_train[['D1', 'D2']], X_test[['D1', 'D2']]]).groupby(['D1', 'D2']).size().to_frame()
-    # coords_dict_df = coords_dict_df[coords_dict_df > 0].to_frame()
     coords_dict_df['z'] = np.arange(coords_dict_df.shape[0])
     coords_dict = coords_dict_df['z'].to_dict()
     # TODO: probably best to use join...
     X_train['z0'] = X_train[['D1', 'D2']].apply(lambda x: coords_dict[(x[0], x[1])], axis=1)
     X_test['z0'] = X_test[['D1', 'D2']].apply(lambda x: coords_dict[(x[0], x[1])], axis=1)
     new_q_spatial = len(coords_dict)
-    D1_coords = np.array(coords_dict_df.reset_index()['D1'].value_counts().index)
-    D2_coords = np.array(coords_dict_df.reset_index()['D2'].value_counts().index)
-    xx, yy = np.meshgrid(D1_ticks[1:], D2_ticks[1:])
-    coords = np.array((xx.ravel(), yy.ravel())).T
+    coords = coords_dict_df.index.to_frame().values
     dist_matrix = squareform(pdist(coords)) ** 2
     kernel = np.exp(-dist_matrix / (2 * lengthscale))
     try:
