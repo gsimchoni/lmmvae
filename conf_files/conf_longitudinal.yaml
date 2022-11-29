@@ -60,6 +60,7 @@ dr_types:
   - 'pca-ohe'
   - 'vae-ignore'
   - 'vae-ohe'
+  - 'vae-embed'
   - 'vrae'
   - 'lmmvae'
   - 'svgpvae-10-16-2'

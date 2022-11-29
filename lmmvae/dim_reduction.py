@@ -55,7 +55,7 @@ def run_lmmpca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, to
 def run_vae(X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
             x_cols, batch_size, epochs, patience, n_neurons, dropout, activation,
             mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False, embed_RE=False):
-    RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode)
+    RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode, pca_type='vae')
     if ignore_RE:
         X_train, X_test = X_train[x_cols], X_test[x_cols]
         p = X_train.shape[1]
