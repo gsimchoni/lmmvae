@@ -286,8 +286,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         ns = np.random.multinomial(n, ps)
         Z_idx = np.repeat(range(qs[0]), ns)
         Z_idx_list = [Z_idx]
-        max_period = np.arange(ns.max())
-        t = 6 * sig2e * np.concatenate([max_period[:k] for k in ns]) / max_period[-1] - sig2e * 3
+        t = np.random.uniform(size=n)
         estimated_cors = params.get('estimated_cors', [])
         cov_mat = get_cov_mat(sig2bs_means, rhos, estimated_cors)
         # if sig2bs_mean < 1:
