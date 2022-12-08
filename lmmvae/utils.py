@@ -164,9 +164,8 @@ def process_X_for_svgpvae(X, x_cols, RE_cols, aux_cols, pca=None, scaler=None, M
     return data_dict, pca, scaler
 
 
-def decrease_spatial_resolution(X_train, X_test, max_spatial_locs, lengthscale=1.0):
+def decrease_spatial_resolution(X_train, X_test, max_spatial_locs, lengthscale=1.0, sig2e=1.0):
     X_train, X_test = X_train.copy(), X_test.copy()
-
     kde = gaussian_kde(X_train[['D1', 'D2']].T)
     new_coords = kde.resample(max_spatial_locs).T
     labels_train = pairwise_distances_argmin(X_train[['D1', 'D2']], new_coords)
@@ -185,11 +184,8 @@ def decrease_spatial_resolution(X_train, X_test, max_spatial_locs, lengthscale=1
     coords = coords_dict_df.index.to_frame().values
     dist_matrix = squareform(pdist(coords)) ** 2
     kernel = np.exp(-dist_matrix / (2 * lengthscale))
-    try:
-        kernel_root = np.linalg.cholesky(kernel)
-    except:
-        jitter = 1e-05
-        kernel_root = np.linalg.cholesky(kernel + jitter * np.eye(kernel.shape[0]))
+    Z = get_dummies(X_train['z0'], new_q_spatial)
+    kernel_root = get_posterior_b_root(kernel, Z, sig2e, n=X_train.shape[0], n_samp=10000)
     return X_train, X_test, kernel_root, new_q_spatial
 
 
@@ -361,7 +357,28 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     X_train = X_train.sort_index()
     X_test = X_test.sort_index()
     U_train = U[X_train.index]
+    if mode in ['spatial2', 'spatial_and_categorical']:
+        kernel_root = get_posterior_b_root(kernel, Z[X_train.index], sig2e, n=X_train.shape[0], n_samp=10000)
     return Data(X_train, X_test, W, U_train, B_list, x_cols, kernel_root, time2measure_dict)
+
+
+def get_posterior_b_root(kernel, Z, sig2e, n, n_samp):
+    n_samp = n_samp if n_samp < n else n
+    samp = np.random.choice(n, size=n_samp, replace=False)
+    samp.sort()
+    Z_samp = Z[samp]
+    V = Z_samp @ kernel @ Z_samp.T + sig2e * np.eye(n_samp)
+    V_inv = np.linalg.inv(V)
+    # K_inv = np.linalg.inv(kernel)
+    # V_inv = (1/sig2e) * np.eye(n) - Z @ np.linalg.inv(K_inv + Z.T @ Z) @ Z.T * (1/(sig2e**2))
+    # kernel_post = kernel @ (np.eye(q_spatial, dtype=np.int8) - Z_samp.T @ ((1/sig2e) * np.eye(n_samp, dtype=np.int8) - Z_samp @ np.linalg.inv(K_inv + Z_samp.T @ Z_samp) @ Z_samp.T * (1/(sig2e**2))) @ Z_samp @ kernel)
+    kernel_post = kernel @ (np.eye(kernel.shape[0]) - Z_samp.T @ V_inv @ Z_samp @ kernel)
+    try:
+        kernel_root = np.linalg.cholesky(kernel_post)
+    except:
+        jitter = 1e-05
+        kernel_root = np.linalg.cholesky(kernel_post + jitter * np.eye(kernel_post.shape[0]))
+    return kernel_root
 
 
 def verify_M(x_cols, M, RE_cols, aux_cols):
