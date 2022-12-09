@@ -283,6 +283,8 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
         Z_idx = np.repeat(range(qs[0]), ns)
         Z_idx_list = [Z_idx]
         t = np.random.uniform(size=n)
+        # t_seq = np.linspace(0, 1, 1000)
+        # t = np.concatenate([t_seq[np.random.choice(1000, size=k, replace=False)] for k in ns]) # for VRAE
         estimated_cors = params.get('estimated_cors', [])
         cov_mat = get_cov_mat(sig2bs_means, rhos, estimated_cors)
         # if sig2bs_mean < 1:
