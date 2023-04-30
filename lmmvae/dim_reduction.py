@@ -34,9 +34,13 @@ def run_pca_ohe_or_ignore(X_train, X_test, x_cols,
     X_reconstructed_te = pca.inverse_transform(X_transformed_te)
     X_reconstructed_te = scaler.inverse_transform(X_reconstructed_te)
 
+    loss_tr, loss_te = -pca.score(X_train), -pca.score(X_test)
+
     none_sigmas = [None for _ in range(n_sig2bs)]
     none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
-    return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], None
+    none_losses = [None for _ in range(3)]
+    losses = [loss_tr] + none_losses + [loss_te] + none_losses
+    return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], None, losses
 
 
 def run_lmmpca(X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, tolerance, max_it, cardinality):
@@ -252,10 +256,10 @@ def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
     start = time.time()
     losses = [None for _ in range(8)]
     if dr_type == 'pca-ignore':
-        X_reconstructed_te, sigmas, n_epochs = run_pca_ohe_or_ignore(
+        X_reconstructed_te, sigmas, n_epochs, losses = run_pca_ohe_or_ignore(
             X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose, ignore_RE=True)
     elif dr_type == 'pca-ohe':
-        X_reconstructed_te, sigmas, n_epochs = run_pca_ohe_or_ignore(
+        X_reconstructed_te, sigmas, n_epochs, losses = run_pca_ohe_or_ignore(
             X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose)
     elif dr_type == 'lmmpca':
         sigmas, n_epochs = run_lmmpca(
