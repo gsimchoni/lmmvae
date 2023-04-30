@@ -383,11 +383,15 @@ class LMMVAE:
         for i in range(self.n_RE_outputs):
             re_codings_mean = re_codings_mean_list[i]
             re_codings_log_var = re_codings_log_var_list[i]
-            re_kl_loss = -0.5 * K.sum(
+            re_kl_loss_i = -0.5 * K.sum(
                 1 + re_codings_log_var - self.re_prior -
                 K.exp(re_codings_log_var - self.re_prior) - K.square(re_codings_mean) * K.exp(-self.re_prior),
                 axis=-1)
-            re_kl_loss = K.mean(re_kl_loss)
+            re_kl_loss_i = K.mean(re_kl_loss_i)
+            if i == 0:
+                re_kl_loss = re_kl_loss_i
+            else:
+                re_kl_loss += re_kl_loss_i
         self.variational_ae.add_loss(beta * kl_loss)
         self.variational_ae.add_loss(beta * re_kl_loss)
         recon_loss = MeanSquaredError()(X_input, reconstructions) * p
