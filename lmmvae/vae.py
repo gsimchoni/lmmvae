@@ -411,6 +411,7 @@ class LMMVAE:
             1 + codings_log_var -
             K.exp(codings_log_var) - K.square(codings_mean),
             axis=-1)
+        kl_loss = K.mean(kl_loss)
         if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
             for i in range(self.n_RE_outputs):
                 re_codings_mean = re_codings_mean_list[i]
@@ -419,7 +420,7 @@ class LMMVAE:
                     1 + re_codings_log_var - self.re_prior -
                     K.exp(re_codings_log_var - self.re_prior) - K.square(re_codings_mean) * K.exp(-self.re_prior),
                     axis=-1)
-                self.variational_ae.add_loss(beta * K.mean(re_kl_loss))
+                re_kl_loss = K.mean(re_kl_loss)
         elif mode == 'spatial':
             re_kl_loss = 0
             for i in range(self.p):
@@ -429,15 +430,16 @@ class LMMVAE:
                     1 + re_codings_log_var - self.re_prior - \
                     K.exp(re_codings_log_var - self.re_prior), axis=-1) +\
                    0.5 * K.exp(-self.re_prior) * tf.linalg.diag_part(K.dot(K.dot(re_codings_mean, self.kernel_inv), K.transpose(re_codings_mean)))#K.dot(K.dot(re_codings_mean, self.kernel_inv), K.transpose(re_codings_mean))
-            self.variational_ae.add_loss(beta * K.mean(re_kl_loss))
+            re_kl_loss = K.mean(re_kl_loss)
         else:
             raise ValueError(f'{mode} is unknown mode')
-        self.variational_ae.add_loss(beta * K.mean(kl_loss))
+        self.variational_ae.add_loss(beta * kl_loss)
+        self.variational_ae.add_loss(beta * re_kl_loss)
         recon_loss = MeanSquaredError()(X_input, reconstructions) * p
         self.variational_ae.add_loss(recon_loss)
         self.variational_ae.add_metric(recon_loss, name='recon_loss')
-        self.variational_ae.add_metric(beta * K.mean(kl_loss), name='kl_loss')
-        self.variational_ae.add_metric(beta * K.mean(re_kl_loss), name='re_kl_loss')
+        self.variational_ae.add_metric(kl_loss, name='kl_loss')
+        self.variational_ae.add_metric(re_kl_loss, name='re_kl_loss')
         self.variational_ae.compile(optimizer='adam')
 
     def _fit(self, X):
@@ -464,10 +466,14 @@ class LMMVAE:
         self._fit(X)
         return self
 
-    def _transform(self, X, U, B_list, extract_B):
-        X_input = X[self.x_cols].copy()
+    def _get_input(self, X):
+        X_inputs = [X[self.x_cols].copy()]
         Z_inputs = [X[RE_col].copy() for RE_col in self.RE_cols]
-        encoder_output = self.variational_encoder.predict([X_input], verbose=0)
+        return X_inputs, Z_inputs
+    
+    def _transform(self, X, U, B_list, extract_B):
+        X_inputs, Z_inputs = self._get_input(X)
+        encoder_output = self.variational_encoder.predict(X_inputs, verbose=0)
         X_transformed = encoder_output[0]
         B_hat_list = encoder_output[1:]
         if extract_B:
@@ -524,3 +530,9 @@ class LMMVAE:
     def get_history(self):
         check_is_fitted(self, 'history')
         return self.history
+    
+    def evaluate(self, X):
+        X_inputs, Z_inputs = self._get_input(X)
+        total_loss, recon_loss, kl_loss, re_kl_loss = \
+            self.variational_ae.evaluate(X_inputs + Z_inputs, verbose=0)
+        return total_loss, recon_loss, kl_loss, re_kl_loss

@@ -146,6 +146,10 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
     X_reconstructed_te = lmmvae.reconstruct(X_transformed_te, X_test[RE_cols], B_hat_list)
     # X_reconstructed_te = scaler.inverse_transform(X_reconstructed_te)
 
+    losses_tr = lmmvae.evaluate(X_train)
+    losses_te = lmmvae.evaluate(X_test)
+    losses = list(losses_tr)+ list(losses_te)
+
     n_epochs = len(lmmvae.get_history().history['loss'])
     sig2bs_mean_est = [np.mean(sig2bs) for sig2bs in sig2bs_hat_list]
     sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
@@ -156,7 +160,7 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
             sig2bs_mean_est = sig2bs_mean_est[1:]
         else:
             sig2bs_mean_est = []
-    return X_reconstructed_te, [None, sig2bs_mean_est, sigmas_spatial], n_epochs
+    return X_reconstructed_te, [None, sig2bs_mean_est, sigmas_spatial], n_epochs, losses
 
 
 def run_svgpvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, mode,
@@ -277,12 +281,12 @@ def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, time2measure_dict, verbose)
     elif dr_type == 'lmmvae':
-        X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
+        X_reconstructed_te, sigmas, n_epochs, losses = run_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, pred_unknown_clusters,
             max_spatial_locs, verbose, U, B_list)
     elif dr_type == 'lmmvae-sfc':
-        X_reconstructed_te, sigmas, n_epochs = run_lmmvae(
+        X_reconstructed_te, sigmas, n_epochs, losses = run_lmmvae(
             X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, x_cols, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, 'spatial_fit_categorical', beta, kernel, pred_unknown_clusters,
             max_spatial_locs, verbose, U, B_list)
