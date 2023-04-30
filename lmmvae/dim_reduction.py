@@ -130,9 +130,9 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
                epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel_root, pred_unknown_clusters,
                max_spatial_locs, verbose, U, B_list):
     RE_cols = get_RE_cols_by_prefix(X_train, RE_cols_prefix, mode)
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'longitudinal', 'spatial_and_categorical']:
         x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2', 't']]
-    if max_spatial_locs is not None and mode in ['spatial', 'spatial2', 'spatial_and_categorical'] and q_spatial > max_spatial_locs:
+    if max_spatial_locs is not None and mode in ['spatial', 'spatial_and_categorical'] and q_spatial > max_spatial_locs:
         print(f'Warning: decreasing spatial resolution, max spatial locations allowed is {max_spatial_locs}')
         X_train, X_test, kernel_root, q_spatial = decrease_spatial_resolution(X_train, X_test, max_spatial_locs)
     lmmvae = LMMVAE(mode, X_train[x_cols].shape[1], x_cols, RE_cols, qs, q_spatial,
@@ -158,7 +158,7 @@ def run_lmmvae(X_train, X_test, RE_cols_prefix, qs, q_spatial, d, n_sig2bs, n_si
     sig2bs_mean_est = [np.mean(sig2bs) for sig2bs in sig2bs_hat_list]
     sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
     # TODO: get rid of this
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'spatial_and_categorical']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial_and_categorical']:
         sigmas_spatial = [sig2bs_mean_est[0], None]
         if mode in ['spatial_fit_categorical', 'spatial_and_categorical'] and len(sig2bs_mean_est) > 1:
             sig2bs_mean_est = sig2bs_mean_est[1:]
@@ -207,7 +207,7 @@ def run_gppvae(X_train, X_test, x_cols, RE_cols_prefix, qs, q_spatial, d, n_sig2
 #     if mode == 'categorical':
 #         aux_cols = []
 #         q = qs[0]
-#     elif mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+#     elif mode in ['spatial', 'spatial_fit_categorical']:
 #         aux_cols = ['D1', 'D2']
 #         q = q_spatial
 #     elif mode == 'longitudinal':
@@ -273,7 +273,7 @@ def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False)
     elif dr_type == 'vae-embed':
-        if mode == 'spatial2':
+        if mode == 'spatial':
             qs = [q_spatial]
         if mode == 'spatial_and_categorical':
             qs = [q for q in qs] + [q_spatial]
@@ -308,7 +308,7 @@ def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
     else:
         raise ValueError(f'{dr_type} is an unknown dr_type')
     end = time.time()
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'longitudinal', 'spatial_and_categorical']:
         x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2', 't']]
     try:
         metric_X = mse(X_test[x_cols].values, X_reconstructed_te[:, :len(x_cols)])

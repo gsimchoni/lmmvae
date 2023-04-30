@@ -78,7 +78,7 @@ def simulation(out_file, params):
     max_spatial_locs = params.get('max_spatial_locs', None)
     if mode == 'categorical':
         assert n_sig2bs == n_categoricals
-    elif mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+    elif mode in ['spatial', 'spatial_fit_categorical']:
         assert n_categoricals == 0
         assert n_sig2bs == 0
         assert n_sig2bs_spatial == 2

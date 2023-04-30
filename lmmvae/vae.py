@@ -295,14 +295,10 @@ class LMMVAE:
         self.qs = qs
         if self.mode in ['spatial_fit_categorical', 'spatial_and_categorical']:
             self.qs = [q_spatial] + list(qs)
-        if self.mode in ['spatial', 'spatial2']:
+        if self.mode == 'spatial':
             self.qs = [q_spatial]
-        if self.mode in ['spatial', 'spatial2', 'spatial_and_categorical']:
+        if self.mode in ['spatial', 'spatial_and_categorical']:
             self.kernel_root = tf.constant(kernel_root, dtype=tf.float32)
-            if self.mode == 'spatial':
-                kernel_root_inv = np.linalg.solve(self.kernel_root, np.eye(self.kernel_root.shape[0]))
-                kernel_root_inv = np.clip(kernel_root_inv, -10, 10)
-                self.kernel_inv = tf.constant(np.dot(kernel_root_inv.T, kernel_root_inv).astype(np.float32))
         self.n_RE_inputs = len(self.qs) if mode in ['categorical', 'spatial_fit_categorical', 'spatial_and_categorical'] else 1
         self.n_RE_outputs = self.n_sig2bs if mode == 'longitudinal' else self.n_RE_inputs
         self.callbacks = [EarlyStopping(monitor='val_loss',
@@ -330,28 +326,16 @@ class LMMVAE:
         codings_mean = Dense(d)(z1)
         codings_log_var = Dense(d)(z1)
         z2 = add_layers_functional(X_input, n_neurons_re, dropout, activation, p)
-        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
-            re_codings_mean_list = []
-            re_codings_log_var_list = []
-            re_codings_list = []
-            for _ in range(self.n_RE_outputs):
-                re_codings_mean = Dense(p)(z2)
-                re_codings_mean_list.append(re_codings_mean)
-                re_codings_log_var = Dense(p)(z2)
-                re_codings_log_var_list.append(re_codings_log_var)
-                re_codings = Sampling()([re_codings_mean, re_codings_log_var])
-                re_codings_list.append(re_codings)
-        elif mode == 'spatial':
-            re_codings_mean_list = []
-            re_codings_log_var_list = []
-            re_codings_list = []
-            for i in range(self.p):
-                re_codings_mean = Dense(self.qs[0])(z2)
-                re_codings_mean_list.append(re_codings_mean)
-                re_codings_log_var = Dense(self.qs[0])(z2)
-                re_codings_log_var_list.append(re_codings_log_var)
-                re_codings = SamplingFull()([re_codings_mean, re_codings_log_var], self.kernel_root)
-                re_codings_list.append(re_codings)
+        re_codings_mean_list = []
+        re_codings_log_var_list = []
+        re_codings_list = []
+        for _ in range(self.n_RE_outputs):
+            re_codings_mean = Dense(p)(z2)
+            re_codings_mean_list.append(re_codings_mean)
+            re_codings_log_var = Dense(p)(z2)
+            re_codings_log_var_list.append(re_codings_log_var)
+            re_codings = Sampling()([re_codings_mean, re_codings_log_var])
+            re_codings_list.append(re_codings)
 
         codings = Sampling()([codings_mean, codings_log_var])
         self.variational_encoder = Model(
@@ -360,39 +344,23 @@ class LMMVAE:
 
         decoder_inputs = Input(shape=d)
         decoder_re_inputs_list = []
-        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
-            for _ in range(self.n_RE_outputs):
-                decoder_re_inputs = Input(shape=p)
-                decoder_re_inputs_list.append(decoder_re_inputs)
-        elif mode == 'spatial':
-            for i in range(self.p):
-                decoder_re_inputs = Input(shape=self.qs[0])
-                decoder_re_inputs_list.append(decoder_re_inputs)
+        for _ in range(self.n_RE_outputs):
+            decoder_re_inputs = Input(shape=p)
+            decoder_re_inputs_list.append(decoder_re_inputs)
         
         n_neurons_rev = None if n_neurons is None else list(reversed(n_neurons))
         dropout_rev = None if dropout is None else list(reversed(dropout))
         x = add_layers_functional(decoder_inputs, n_neurons_rev, dropout_rev, activation, d)
         decoder_output = Dense(p)(x)
         outputs = decoder_output
-        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
-            for i in range(self.n_RE_outputs):
-                Z = Z_mats[i]
-                decoder_re_inputs = decoder_re_inputs_list[i]
-                q_ind = 0 if self.mode == 'longitudinal' else i
-                Z0 = Z_mats[q_ind]
-                B = tf.math.divide_no_nan(K.dot(K.transpose(Z0), decoder_re_inputs), K.reshape(K.sum(Z0, axis=0), (self.qs[q_ind], 1)))
-                if mode == 'spatial2' or (mode == 'spatial_and_categorical' and i == 0):
-                    B = self.kernel_root @ B
-                ZB = K.dot(Z, B)
-                outputs += ZB
-        elif mode == 'spatial':
-            B_list = []
-            Z = Z_mats[0]
-            for i in range(self.p):
-                decoder_re_inputs = decoder_re_inputs_list[i]
-                B_k = K.reshape(K.mean(decoder_re_inputs, axis=0), (self.qs[0], 1))
-                B_list.append(B_k)
-            B = tf.concat(B_list, axis=1)
+        for i in range(self.n_RE_outputs):
+            Z = Z_mats[i]
+            decoder_re_inputs = decoder_re_inputs_list[i]
+            q_ind = 0 if self.mode == 'longitudinal' else i
+            Z0 = Z_mats[q_ind]
+            B = tf.math.divide_no_nan(K.dot(K.transpose(Z0), decoder_re_inputs), K.reshape(K.sum(Z0, axis=0), (self.qs[q_ind], 1)))
+            if mode == 'spatial' or (mode == 'spatial_and_categorical' and i == 0):
+                B = self.kernel_root @ B
             ZB = K.dot(Z, B)
             outputs += ZB
         self.variational_decoder = Model(
@@ -412,27 +380,14 @@ class LMMVAE:
             K.exp(codings_log_var) - K.square(codings_mean),
             axis=-1)
         kl_loss = K.mean(kl_loss)
-        if mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
-            for i in range(self.n_RE_outputs):
-                re_codings_mean = re_codings_mean_list[i]
-                re_codings_log_var = re_codings_log_var_list[i]
-                re_kl_loss = -0.5 * K.sum(
-                    1 + re_codings_log_var - self.re_prior -
-                    K.exp(re_codings_log_var - self.re_prior) - K.square(re_codings_mean) * K.exp(-self.re_prior),
-                    axis=-1)
-                re_kl_loss = K.mean(re_kl_loss)
-        elif mode == 'spatial':
-            re_kl_loss = 0
-            for i in range(self.p):
-                re_codings_mean = re_codings_mean_list[i]
-                re_codings_log_var = re_codings_log_var_list[i]
-                re_kl_loss += - 0.5 * K.sum(
-                    1 + re_codings_log_var - self.re_prior - \
-                    K.exp(re_codings_log_var - self.re_prior), axis=-1) +\
-                   0.5 * K.exp(-self.re_prior) * tf.linalg.diag_part(K.dot(K.dot(re_codings_mean, self.kernel_inv), K.transpose(re_codings_mean)))#K.dot(K.dot(re_codings_mean, self.kernel_inv), K.transpose(re_codings_mean))
+        for i in range(self.n_RE_outputs):
+            re_codings_mean = re_codings_mean_list[i]
+            re_codings_log_var = re_codings_log_var_list[i]
+            re_kl_loss = -0.5 * K.sum(
+                1 + re_codings_log_var - self.re_prior -
+                K.exp(re_codings_log_var - self.re_prior) - K.square(re_codings_mean) * K.exp(-self.re_prior),
+                axis=-1)
             re_kl_loss = K.mean(re_kl_loss)
-        else:
-            raise ValueError(f'{mode} is unknown mode')
         self.variational_ae.add_loss(beta * kl_loss)
         self.variational_ae.add_loss(beta * re_kl_loss)
         recon_loss = MeanSquaredError()(X_input, reconstructions) * p
@@ -485,22 +440,14 @@ class LMMVAE:
     
     def extract_Bs_to_compare(self, Z_inputs, B_hat_list):
         B_df2_list = []
-        if self.mode in ['categorical', 'spatial_fit_categorical', 'spatial2', 'longitudinal', 'spatial_and_categorical']:
-            for i in range(self.n_RE_outputs):
-                B_df = pd.DataFrame(B_hat_list[i])
-                q_ind = 0 if self.mode == 'longitudinal' else i
-                B_df['z'] = Z_inputs[q_ind].values
-                B_df2 = B_df.groupby('z')[B_df.columns[:self.p]].mean()
-                B_df2 = B_df2.reindex(range(self.qs[q_ind]), fill_value=0)
-                if self.mode == 'spatial2' or (self.mode == 'spatial_and_categorical' and i == 0):
-                    B_df2 = pd.DataFrame(self.kernel_root.numpy() @ B_df2.values)
-                B_df2_list.append(B_df2)
-        elif self.mode in ['spatial']:
-            B_k_list = []
-            for i in range(self.p):
-                B_k = B_hat_list[i].mean(axis=0)[:, np.newaxis]
-                B_k_list.append(B_k)
-            B_df2 = pd.DataFrame(np.hstack(B_k_list))
+        for i in range(self.n_RE_outputs):
+            B_df = pd.DataFrame(B_hat_list[i])
+            q_ind = 0 if self.mode == 'longitudinal' else i
+            B_df['z'] = Z_inputs[q_ind].values
+            B_df2 = B_df.groupby('z')[B_df.columns[:self.p]].mean()
+            B_df2 = B_df2.reindex(range(self.qs[q_ind]), fill_value=0)
+            if self.mode == 'spatial' or (self.mode == 'spatial_and_categorical' and i == 0):
+                B_df2 = pd.DataFrame(self.kernel_root.numpy() @ B_df2.values)
             B_df2_list.append(B_df2)
         return B_df2_list
 

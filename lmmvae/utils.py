@@ -44,7 +44,7 @@ def get_RE_cols_by_prefix(df, prefix, mode, pca_type='lmmvae'):
 def get_aux_cols(mode):
     if mode == 'categorical':
         return []
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'spatial_and_categorical']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial_and_categorical']:
         return ['D1', 'D2']
     if mode == 'longitudinal':
         return ['t']
@@ -54,7 +54,7 @@ def get_aux_cols(mode):
 def verify_q(qs, q_spatial, mode):
     if mode in ['categorical', 'longitudinal']:
         return qs[0]
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2']:
+    if mode in ['spatial', 'spatial_fit_categorical']:
         return q_spatial
     if mode == 'spatial_and_categorical':
         if len(qs) > 1:
@@ -227,7 +227,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
             Z = get_dummies(Z_idx, q)
             X += Z @ B
             Z_idx_list.append(Z_idx)
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'spatial_and_categorical']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial_and_categorical']:
         if sig2bs_spatial_mean[0] < 1:
             fs_factor = sig2bs_spatial_mean[0]
         else:
@@ -330,7 +330,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     df.columns = x_cols
     for k, Z_idx in enumerate(Z_idx_list):
         df['z' + str(k)] = Z_idx
-    if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'spatial_and_categorical']:
+    if mode in ['spatial', 'spatial_fit_categorical', 'spatial_and_categorical']:
         df = pd.concat([df, coords_df], axis=1)
         x_cols.extend(co_cols)
     if mode == 'longitudinal':
@@ -346,7 +346,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     test_size = params.get('test_size', 0.2)
     pred_unknown_clusters = params.get('pred_unknown_clusters', False)
     if pred_unknown_clusters:
-        if mode in ['spatial', 'spatial_fit_categorical', 'spatial2', 'spatial_and_categorical']:
+        if mode in ['spatial', 'spatial_fit_categorical', 'spatial_and_categorical']:
             cluster_q = q_spatial
         else:
             cluster_q = qs[0]
@@ -359,7 +359,7 @@ def generate_data(mode, n, qs, q_spatial, d, sig2e, sig2bs_means, sig2bs_spatial
     X_train = X_train.sort_index()
     X_test = X_test.sort_index()
     U_train = U[X_train.index]
-    if mode in ['spatial2', 'spatial_and_categorical']:
+    if mode in ['spatial', 'spatial_and_categorical']:
         kernel_root = get_posterior_b_root(kernel, Z[X_train.index], sig2e, n=X_train.shape[0], n_samp=10000)
     return Data(X_train, X_test, W, U_train, B_list, x_cols, kernel_root, time2measure_dict)
 

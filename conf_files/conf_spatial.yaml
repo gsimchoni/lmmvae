@@ -1,4 +1,4 @@
-mode: 'spatial2'
+mode: 'spatial'
 rho_list: []
 sig2e_list:
   - 1.0
