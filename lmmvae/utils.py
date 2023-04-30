@@ -12,7 +12,7 @@ from sklearn.metrics import pairwise_distances_argmin
 
 
 DRResult = namedtuple(
-    'PCAResult', ['metric_X', 'sigmas', 'rhos', 'n_epochs', 'time'])
+    'PCAResult', ['metric_X', 'sigmas', 'rhos', 'n_epochs', 'time', 'losses'])
 
 Data = namedtuple('PCAData', [
     'X_train', 'X_test', 'W', 'U', 'B_list', 'x_cols', 'kernel', 'time2measure_dict'

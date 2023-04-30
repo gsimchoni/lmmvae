@@ -55,7 +55,8 @@ def summarize_sim(dr_in, res, dr_type):
     res = [dr_in.mode, dr_in.N, dr_in.p, dr_in.d, dr_in.sig2e, dr_in.beta, dr_in.re_prior] + \
         list(dr_in.qs) + q_spatial + list(dr_in.sig2bs_means) + list(dr_in.sig2bs_spatial) + list(dr_in.rhos) + \
         [dr_in.sig2bs_identical, dr_in.thresh, dr_in.k, dr_type,
-        res.metric_X, res.sigmas[0]] + res.sigmas[1] + res.sigmas[2] + res.rhos + [res.n_epochs, res.time]
+        res.metric_X, res.sigmas[0]] + res.sigmas[1] + res.sigmas[2] + res.rhos + [res.n_epochs, res.time] + \
+        res.losses
     return res
 
 
@@ -109,7 +110,10 @@ def simulation(out_file, params):
         qs_names + q_spatial_name + sig2bs_names +
         sig2bs_spatial_names + rhos_names + ['sig2bs_identical', 'thresh'] +
         ['experiment', 'exp_type', 'mse_X', 'sig2e_est'] + sig2bs_est_names +
-        sig2bs_spatial_est_names + rhos_est_names + ['n_epochs', 'time'])
+        sig2bs_spatial_est_names + rhos_est_names + ['n_epochs', 'time'] +
+        ['total_loss_tr', 'recon_loss_tr', 'kl_loss_tr', 're_kl_loss_tr'] +
+        ['total_loss_te', 'recon_loss_te', 'kl_loss_te', 're_kl_loss_te']
+        )
     for N in params['N_list']:
         for sig2e in params['sig2e_list']:
             for qs in product(*params['q_list']):

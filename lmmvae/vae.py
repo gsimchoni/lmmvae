@@ -126,8 +126,12 @@ class VAE:
             1 + codings_log_var -
             K.exp(codings_log_var) - K.square(codings_mean),
             axis=-1)
-        self.variational_ae.add_loss(beta * K.mean(kl_loss))
-        self.variational_ae.add_loss(MeanSquaredError()(X_input, reconstructions))
+        kl_loss = K.mean(kl_loss)
+        self.variational_ae.add_loss(beta * kl_loss)
+        recon_loss = MeanSquaredError()(X_input, reconstructions) * p
+        self.variational_ae.add_loss(recon_loss)
+        self.variational_ae.add_metric(recon_loss, name='recon_loss')
+        self.variational_ae.add_metric(kl_loss, name='kl_loss')
         self.variational_ae.compile(optimizer='adam')
 
     def _fit(self, X):
@@ -146,13 +150,17 @@ class VAE:
         self._fit(X)
         return self
 
-    def _transform(self, X):
+    def _get_input(self, X):
         if self.embed_RE:
             X_inputs = [X[self.x_cols].copy()]
             Z_inputs = [X[RE_col].copy() for RE_col in self.RE_cols]
         else:
             X_inputs = [X]
             Z_inputs = []
+        return X_inputs, Z_inputs
+    
+    def _transform(self, X):
+        X_inputs, Z_inputs = self._get_input(X)
         _, _, X_transformed = self.variational_encoder.predict(X_inputs + Z_inputs, verbose=0)
         return X_transformed
 
@@ -171,6 +179,11 @@ class VAE:
     def get_history(self):
         check_is_fitted(self, 'history')
         return self.history
+    
+    def evaluate(self, X):
+        X_inputs, Z_inputs = self._get_input(X)
+        total_loss, recon_loss, kl_loss = self.variational_ae.evaluate(X_inputs + Z_inputs, verbose=0)
+        return total_loss, recon_loss, kl_loss
 
 
 class VRAE:
@@ -420,7 +433,11 @@ class LMMVAE:
         else:
             raise ValueError(f'{mode} is unknown mode')
         self.variational_ae.add_loss(beta * K.mean(kl_loss))
-        self.variational_ae.add_loss(MeanSquaredError()(X_input, reconstructions))
+        recon_loss = MeanSquaredError()(X_input, reconstructions) * p
+        self.variational_ae.add_loss(recon_loss)
+        self.variational_ae.add_metric(recon_loss, name='recon_loss')
+        self.variational_ae.add_metric(beta * K.mean(kl_loss), name='kl_loss')
+        self.variational_ae.add_metric(beta * K.mean(re_kl_loss), name='re_kl_loss')
         self.variational_ae.compile(optimizer='adam')
 
     def _fit(self, X):

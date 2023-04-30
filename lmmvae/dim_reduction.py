@@ -77,10 +77,14 @@ def run_vae(X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
     X_transformed_te = vae.transform(X_test)
     X_reconstructed_te = vae.reconstruct(X_transformed_te)
 
+    losses_tr = vae.evaluate(X_train)
+    losses_te = vae.evaluate(X_test)
+    losses = list(losses_tr) + [None] + list(losses_te) + [None]
+
     n_epochs = len(vae.get_history().history['loss'])
     none_sigmas = [None for _ in range(n_sig2bs)]
     none_sigmas_spatial = [None for _ in range(n_sig2bs_spatial)]
-    return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], n_epochs
+    return X_reconstructed_te, [None, none_sigmas, none_sigmas_spatial], n_epochs, losses
 
 
 def run_vrae(X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial,
@@ -242,6 +246,7 @@ def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             max_spatial_locs, time2measure_dict, verbose, U, B_list):
     gc.collect()
     start = time.time()
+    losses = [None for _ in range(8)]
     if dr_type == 'pca-ignore':
         X_reconstructed_te, sigmas, n_epochs = run_pca_ohe_or_ignore(
             X_train, X_test, x_cols, RE_cols_prefix, d, n_sig2bs, n_sig2bs_spatial, mode, verbose, ignore_RE=True)
@@ -252,11 +257,11 @@ def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
         sigmas, n_epochs = run_lmmpca(
             X_train, X_test, RE_cols_prefix, d, n_sig2bs_spatial, verbose, thresh, epochs, qs[0])
     elif dr_type == 'vae-ignore':
-        X_reconstructed_te, sigmas, n_epochs = run_vae(
+        X_reconstructed_te, sigmas, n_epochs, losses = run_vae(
             X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=True)
     elif dr_type == 'vae-ohe':
-        X_reconstructed_te, sigmas, n_epochs = run_vae(
+        X_reconstructed_te, sigmas, n_epochs, losses = run_vae(
             X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False)
     elif dr_type == 'vae-embed':
@@ -264,7 +269,7 @@ def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
             qs = [q_spatial]
         if mode == 'spatial_and_categorical':
             qs = [q for q in qs] + [q_spatial]
-        X_reconstructed_te, sigmas, n_epochs = run_vae(
+        X_reconstructed_te, sigmas, n_epochs, losses = run_vae(
             X_train, X_test, RE_cols_prefix, qs, d, n_sig2bs_spatial, x_cols, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, embed_RE=True)
     elif dr_type == 'vrae':
@@ -302,4 +307,4 @@ def run_dim_reduction(X_train, X_test, x_cols, RE_cols_prefix, d, dr_type,
     except:
         metric_X = np.nan
     none_rhos = [None for _ in range(len(est_cors))]
-    return DRResult(metric_X, sigmas, none_rhos, n_epochs, end - start)
+    return DRResult(metric_X, sigmas, none_rhos, n_epochs, end - start, losses)
