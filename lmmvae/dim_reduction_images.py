@@ -64,7 +64,8 @@ def run_pca_ohe_or_ignore_images(X_train, X_test, Z_train, Z_test, d,
 
 def run_vae_images(X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, d, n_sig2bs_spatial,
             batch_size, epochs, patience, n_neurons, dropout, activation,
-            mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False, embed_RE=False, cnn=False):
+            mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=False, embed_RE=False, cnn=False,
+            is_generator=False, train_generator=None, valid_generator=None, test_generator=None):
 
     if cnn:
         vae = VAEIMGCNN(img_height, img_width, channels, d, batch_size, epochs, patience, n_neurons, dropout, activation,
@@ -77,12 +78,20 @@ def run_vae_images(X_train, X_test, Z_train, Z_test, img_height, img_width, chan
     # X_train = scaler.fit_transform(X_train)
     # X_test = scaler.transform(X_test)
 
-    X_transformed_tr = vae.fit_transform(X_train, Z_train)
-    X_transformed_te = vae.transform(X_test, Z_test)
-    X_reconstructed_te = vae.reconstruct(X_transformed_te)
+    if is_generator:
+        X_transformed_tr = vae.fit_transform_gen(train_generator, valid_generator)
+        X_transformed_te = vae.transform_gen(test_generator)
+        mse_te = vae.recon_error_on_batches(test_generator, X_transformed_te)
+        X_reconstructed_te = mse_te # TODO: terrible code
+        losses_tr = vae.evaluate_gen(train_generator)
+        losses_te = vae.evaluate_gen(test_generator)
+    else:
+        X_transformed_tr = vae.fit_transform(X_train, Z_train)
+        X_transformed_te = vae.transform(X_test, Z_test)
+        X_reconstructed_te = vae.reconstruct(X_transformed_te)
+        losses_tr = vae.evaluate(X_train, Z_train)
+        losses_te = vae.evaluate(X_test, Z_test)
 
-    losses_tr = vae.evaluate(X_train, Z_train)
-    losses_te = vae.evaluate(X_test, Z_test)
     losses = list(losses_tr) + [None] + list(losses_te) + [None]
 
     n_epochs = len(vae.get_history().history['loss'])
@@ -93,7 +102,8 @@ def run_vae_images(X_train, X_test, Z_train, Z_test, img_height, img_width, chan
 def run_lmmvae_images(X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, q_spatial,
                 d, n_sig2bs, n_sig2bs_spatial, re_prior, batch_size, epochs, patience, n_neurons,
                 n_neurons_re, dropout, activation, mode, beta, kernel_root, pred_unknown_clusters,
-                max_spatial_locs, verbose, U, B_list, cnn=False):
+                max_spatial_locs, verbose, U, B_list, cnn=False,
+                is_generator=False, train_generator=None, valid_generator=None, test_generator=None):
     
     if cnn:
         lmmvae = LMMVAEIMGCNN(mode, img_height, img_width, channels, qs, q_spatial,
@@ -103,13 +113,21 @@ def run_lmmvae_images(X_train, X_test, Z_train, Z_test, img_height, img_width, c
         lmmvae = LMMVAEIMG(mode, img_height, img_width, channels, qs, q_spatial,
                         d, n_sig2bs, re_prior, batch_size, epochs, patience, n_neurons, n_neurons_re,
                         dropout, activation, beta, kernel_root, pred_unknown_clusters, verbose)
-
-    X_transformed_tr, B_hat_list, sig2bs_hat_list = lmmvae.fit_transform(X_train, Z_train, U, B_list)
-    X_transformed_te, _, _ = lmmvae.transform(X_test, Z_test, U, B_list)
-    X_reconstructed_te = lmmvae.reconstruct(X_transformed_te, Z_test, B_hat_list)
-
-    losses_tr = lmmvae.evaluate(X_train, Z_train)
-    losses_te = lmmvae.evaluate(X_test, Z_test)
+    
+    if is_generator:
+        X_transformed_tr, B_hat_list, sig2bs_hat_list = lmmvae.fit_transform_gen(train_generator, valid_generator, U, B_list)
+        X_transformed_te, _, _ = lmmvae.transform_gen(test_generator, U, B_list)
+        mse_te = lmmvae.recon_error_on_batches(test_generator, X_transformed_te, B_hat_list)
+        X_reconstructed_te = mse_te # TODO: terrible code
+        losses_tr = lmmvae.evaluate_gen(train_generator)
+        losses_te = lmmvae.evaluate_gen(test_generator)
+    else:
+        X_transformed_tr, B_hat_list, sig2bs_hat_list = lmmvae.fit_transform(X_train, Z_train, U, B_list)
+        X_transformed_te, _, _ = lmmvae.transform(X_test, Z_test, U, B_list)
+        X_reconstructed_te = lmmvae.reconstruct(X_transformed_te, Z_test, B_hat_list)
+        losses_tr = lmmvae.evaluate(X_train, Z_train)
+        losses_te = lmmvae.evaluate(X_test, Z_test)
+    
     losses = list(losses_tr)+ list(losses_te)
 
     n_epochs = len(lmmvae.get_history().history['loss'])
@@ -129,7 +147,8 @@ def run_dim_reduction_images(X_train, X_test, Z_train, Z_test, img_height, img_w
             thresh, epochs, qs, q_spatial, n_sig2bs, n_sig2bs_spatial,
             est_cors, batch_size, patience, n_neurons, n_neurons_re, dropout,
             activation, mode, beta, re_prior, kernel, pred_unknown_clusters,
-            max_spatial_locs, time2measure_dict, verbose, U, B_list):
+            max_spatial_locs, time2measure_dict, verbose, U, B_list,
+            train_generator=None, valid_generator=None, test_generator=None):
     gc.collect()
     start = time.time()
     losses = [None for _ in range(8)]
@@ -143,10 +162,20 @@ def run_dim_reduction_images(X_train, X_test, Z_train, Z_test, img_height, img_w
         X_reconstructed_te, sigmas, n_epochs, losses = run_vae_images(
             X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, d, n_sig2bs_spatial, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=True)
+    elif dr_type == 'vae-ignore-gen':
+        X_reconstructed_te, sigmas, n_epochs, losses = run_vae_images(
+            X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, d, n_sig2bs_spatial, batch_size,
+            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=True,
+            is_generator=True, train_generator=train_generator, valid_generator=valid_generator, test_generator=test_generator)
     elif dr_type == 'vae-ignore-cnn':
         X_reconstructed_te, sigmas, n_epochs, losses = run_vae_images(
             X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, d, n_sig2bs_spatial, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=True, cnn=True)
+    elif dr_type == 'vae-ignore-cnn-gen':
+        X_reconstructed_te, sigmas, n_epochs, losses = run_vae_images(
+            X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, d, n_sig2bs_spatial, batch_size,
+            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, ignore_RE=True, cnn=True,
+            is_generator=True, train_generator=train_generator, valid_generator=valid_generator, test_generator=test_generator)
     elif dr_type == 'vae-embed':
         if mode == 'spatial':
             qs = [q_spatial]
@@ -155,6 +184,15 @@ def run_dim_reduction_images(X_train, X_test, Z_train, Z_test, img_height, img_w
         X_reconstructed_te, sigmas, n_epochs, losses = run_vae_images(
             X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, d, n_sig2bs_spatial, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, embed_RE=True)
+    elif dr_type == 'vae-embed-gen':
+        if mode == 'spatial':
+            qs = [q_spatial]
+        if mode == 'spatial_and_categorical':
+            qs = [q for q in qs] + [q_spatial]
+        X_reconstructed_te, sigmas, n_epochs, losses = run_vae_images(
+            X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, d, n_sig2bs_spatial, batch_size,
+            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, embed_RE=True,
+            is_generator=True, train_generator=train_generator, valid_generator=valid_generator, test_generator=test_generator)
     elif dr_type == 'vae-embed-cnn':
         if mode == 'spatial':
             qs = [q_spatial]
@@ -163,24 +201,48 @@ def run_dim_reduction_images(X_train, X_test, Z_train, Z_test, img_height, img_w
         X_reconstructed_te, sigmas, n_epochs, losses = run_vae_images(
             X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, d, n_sig2bs_spatial, batch_size,
             epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, embed_RE=True, cnn=True)
+    elif dr_type == 'vae-embed-cnn-gen':
+        if mode == 'spatial':
+            qs = [q_spatial]
+        if mode == 'spatial_and_categorical':
+            qs = [q for q in qs] + [q_spatial]
+        X_reconstructed_te, sigmas, n_epochs, losses = run_vae_images(
+            X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, d, n_sig2bs_spatial, batch_size,
+            epochs, patience, n_neurons, dropout, activation, mode, n_sig2bs, beta, pred_unknown_clusters, verbose, embed_RE=True, cnn=True,
+            is_generator=True, train_generator=train_generator, valid_generator=valid_generator, test_generator=test_generator)
     elif dr_type == 'lmmvae':
         X_reconstructed_te, sigmas, n_epochs, losses = run_lmmvae_images(
             X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, pred_unknown_clusters,
             max_spatial_locs, verbose, U, B_list)
+    elif dr_type == 'lmmvae-gen':
+        X_reconstructed_te, sigmas, n_epochs, losses = run_lmmvae_images(
+            X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, re_prior, batch_size,
+            epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, pred_unknown_clusters,
+            max_spatial_locs, verbose, U, B_list,
+            is_generator=True, train_generator=train_generator, valid_generator=valid_generator, test_generator=test_generator)
     elif dr_type == 'lmmvae-cnn':
         X_reconstructed_te, sigmas, n_epochs, losses = run_lmmvae_images(
             X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, pred_unknown_clusters,
             max_spatial_locs, verbose, U, B_list, cnn=True)
+    elif dr_type == 'lmmvae-cnn-gen':
+        X_reconstructed_te, sigmas, n_epochs, losses = run_lmmvae_images(
+            X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, re_prior, batch_size,
+            epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, pred_unknown_clusters,
+            max_spatial_locs, verbose, U, B_list, cnn=True,
+            is_generator=True, train_generator=train_generator, valid_generator=valid_generator, test_generator=test_generator)
     else:
         raise ValueError(f'{dr_type} is an unknown dr_type')
     end = time.time()
     if mode in ['spatial', 'spatial_fit_categorical', 'longitudinal', 'spatial_and_categorical']:
         pass #x_cols = [x_col for x_col in x_cols if x_col not in ['D1', 'D2', 't']]
-    try:
-        metric_X = np.mean((X_test - X_reconstructed_te)**2)
-    except:
-        metric_X = np.nan
+    if dr_type.endswith('gen'):
+        metric_X = X_reconstructed_te
+    else:
+        try:
+            metric_X = np.mean((X_test - X_reconstructed_te)**2)
+        except:
+            metric_X = np.nan
     none_rhos = [None for _ in range(len(est_cors))]
     return DRResult(metric_X, sigmas, none_rhos, n_epochs, end - start, losses)

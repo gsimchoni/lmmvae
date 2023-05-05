@@ -16,6 +16,7 @@ from tensorflow.keras.models import Model
 
 from lmmvae.vae import Sampling, add_layers_functional
 from lmmvae.utils import get_dummies
+from lmmvae.utils_images import custom_generator_fit, custom_generator_predict, divide, get_full_RE_cols_from_generator
 
 def add_layers_functional_conv2d(X_input, n_neurons, dropout, activation, input_dim):
     if n_neurons is not None and len(n_neurons) > 0:
@@ -136,6 +137,19 @@ class VAEIMG:
                                                callbacks=self.callbacks, batch_size=self.batch_size,
                                                validation_split=0.1, verbose=self.verbose)
         gc.collect()
+    
+    def _fit_gen(self, train_generator, valid_generator):
+        steps_train = divide(train_generator.n, train_generator.batch_size)
+        steps_valid = divide(valid_generator.n, valid_generator.batch_size)
+        train_gen = custom_generator_fit(train_generator, self.epochs, self.embed_RE)
+        valid_gen = custom_generator_fit(valid_generator, self.epochs, self.embed_RE)
+        self.history = self.variational_ae.fit(train_gen,
+                                               validation_data=valid_gen,
+                                               epochs=self.epochs, callbacks=self.callbacks,
+                                               batch_size=self.batch_size, verbose=self.verbose,
+                                               steps_per_epoch = steps_train,
+                                               validation_steps = steps_valid)
+        gc.collect()
 
     def fit(self, X, Z):
         self._fit(X, Z)
@@ -155,17 +169,47 @@ class VAEIMG:
         _, _, X_transformed = self.variational_encoder.predict(X_inputs + Z_inputs, verbose=0)
         return X_transformed
 
+    def _transform_gen(self, generator):
+        generator.reset()
+        prev_shuffle_state = generator.shuffle
+        generator.shuffle = False
+        steps = divide(generator.n, generator.batch_size)
+        gen = custom_generator_predict(generator, self.epochs, self.embed_RE)
+        _, _, X_transformed = self.variational_encoder.predict(gen, steps=steps, verbose=0)
+        generator.shuffle = prev_shuffle_state
+        return X_transformed
+    
     def transform(self, X, Z):
         check_is_fitted(self, 'history')
         return self._transform(X, Z)
 
+    def transform_gen(self, generator):
+        check_is_fitted(self, 'history')
+        return self._transform_gen(generator)
+    
     def fit_transform(self, X, Z):
         self._fit(X, Z)
         return self._transform(X, Z)
     
+    def fit_transform_gen(self, train_generator, valid_generator):
+        self._fit_gen(train_generator, valid_generator)
+        return self._transform_gen(train_generator)
+    
     def reconstruct(self, X_transformed):
         X_reconstructed = self.variational_decoder.predict([X_transformed], verbose=0)
         return X_reconstructed
+    
+    def recon_error_on_batches(self, generator, X_transformed):
+        generator.reset()
+        steps = divide(generator.n, generator.batch_size)
+        total_recon_err = 0
+        for i in range(steps):
+            batch, _ = generator.next()
+            idx = np.arange(i * generator.batch_size, i * generator.batch_size + batch.shape[0])
+            batch_reconstructed = self.variational_decoder.predict_on_batch([X_transformed[idx]])
+            total_recon_err += np.sum((batch - batch_reconstructed)**2)
+        avg_recon_err = total_recon_err / (generator.n * np.prod(generator.image_shape))
+        return avg_recon_err
 
     def get_history(self):
         check_is_fitted(self, 'history')
@@ -174,6 +218,12 @@ class VAEIMG:
     def evaluate(self, X, Z):
         X_inputs, Z_inputs = self._get_input(X, Z)
         total_loss, recon_loss, kl_loss = self.variational_ae.evaluate(X_inputs + Z_inputs, verbose=0)
+        return total_loss, recon_loss, kl_loss
+    
+    def evaluate_gen(self, generator):
+        steps = divide(generator.n, generator.batch_size)
+        gen = custom_generator_fit(generator, self.epochs, self.embed_RE)
+        total_loss, recon_loss, kl_loss = self.variational_ae.evaluate(gen, steps=steps, verbose=0)
         return total_loss, recon_loss, kl_loss
 
 
@@ -671,6 +721,19 @@ class LMMVAEIMG:
                 verbose=self.verbose)
         gc.collect()
 
+    def _fit_gen(self, train_generator, valid_generator):
+        steps_train = divide(train_generator.n, train_generator.batch_size)
+        steps_valid = divide(valid_generator.n, valid_generator.batch_size)
+        train_gen = custom_generator_fit(train_generator, self.epochs, with_RE=True)
+        valid_gen = custom_generator_fit(valid_generator, self.epochs, with_RE=True)
+        self.history = self.variational_ae.fit(train_gen,
+                                               validation_data=valid_gen,
+                                               epochs=self.epochs, callbacks=self.callbacks,
+                                               batch_size=self.batch_size, verbose=self.verbose,
+                                               steps_per_epoch = steps_train,
+                                               validation_steps = steps_valid)
+        gc.collect()
+
     def fit(self, X, Z):
         self._fit(X, Z)
         return self
@@ -692,6 +755,25 @@ class LMMVAEIMG:
         else:
             return X_transformed, None, None
     
+    def _transform_gen(self, generator, U, B_list, extract_B):
+        steps = divide(generator.n, generator.batch_size)
+        generator.reset()
+        prev_shuffle_state = generator.shuffle
+        generator.shuffle = False
+        gen = custom_generator_predict(generator, self.epochs, with_RE=False)
+        encoder_output = self.variational_encoder.predict(gen, steps=steps, verbose=0)
+        X_transformed = encoder_output[0]
+        B_hat_list = encoder_output[1:]
+        if extract_B:
+            Z_inputs = get_full_RE_cols_from_generator(generator)
+            B_hat_list_processed = self.extract_Bs_to_compare(Z_inputs, B_hat_list)
+            sig2bs_hat_list = [B_hat_list_processed[i].var(axis=0) for i in range(len(B_hat_list_processed))]
+            generator.shuffle = prev_shuffle_state
+            return X_transformed, B_hat_list_processed, sig2bs_hat_list
+        else:
+            generator.shuffle = prev_shuffle_state
+            return X_transformed, None, None
+    
     def extract_Bs_to_compare(self, Z_inputs, B_hat_list):
         B_df2_list = []
         for i in range(self.n_RE_outputs):
@@ -711,9 +793,17 @@ class LMMVAEIMG:
         check_is_fitted(self, 'history')
         return self._transform(X, Z, U, B_list, extract_B)
 
+    def transform_gen(self, generator, U, B_list, extract_B=False):
+        check_is_fitted(self, 'history')
+        return self._transform_gen(generator, U, B_list, extract_B)
+    
     def fit_transform(self, X, Z, U, B_list, reconstruct_B=True):
         self._fit(X, Z)
         return self._transform(X, Z, U, B_list, reconstruct_B)
+    
+    def fit_transform_gen(self, train_generator, valid_generator, U, B_list, reconstruct_B=True):
+        self._fit_gen(train_generator, valid_generator)
+        return self._transform_gen(train_generator, U, B_list, reconstruct_B)
 
     def reconstruct(self, X_transformed, Z_idxs, B_list):
         X_reconstructed = self.variational_decoder_no_re.predict([X_transformed], verbose=0)
@@ -730,6 +820,23 @@ class LMMVAEIMG:
                 X_reconstructed += np.tensordot(Z.toarray(),  B_list[i], axes=[1,0])
         return X_reconstructed
     
+    def recon_error_on_batches(self, generator, X_transformed, B_list):
+        generator.reset()
+        steps = divide(generator.n, generator.batch_size)
+        total_recon_err = 0
+        for i in range(steps):
+            batch, Z_idxs = generator.next()
+            idx = np.arange(i * generator.batch_size, i * generator.batch_size + batch.shape[0])
+            batch_reconstructed = self.variational_decoder_no_re.predict_on_batch([X_transformed[idx]])
+            if len(Z_idxs.shape) == 1:
+                Z_idxs = Z_idxs[:, np.newaxis]
+            for i in range(Z_idxs.shape[1]):
+                Z = get_dummies(Z_idxs[:, i], self.qs[i])
+                batch_reconstructed += np.tensordot(Z.toarray(),  B_list[i], axes=[1,0])
+            total_recon_err += np.sum((batch - batch_reconstructed)**2)
+        avg_recon_err = total_recon_err / (generator.n * np.prod(generator.image_shape))
+        return avg_recon_err
+    
     def get_history(self):
         check_is_fitted(self, 'history')
         return self.history
@@ -738,4 +845,11 @@ class LMMVAEIMG:
         X_inputs, Z_inputs = self._get_input(X, Z)
         total_loss, recon_loss, kl_loss, re_kl_loss = \
             self.variational_ae.evaluate(X_inputs + Z_inputs, verbose=0)
+        return total_loss, recon_loss, kl_loss, re_kl_loss
+    
+    def evaluate_gen(self, generator):
+        steps = divide(generator.n, generator.batch_size)
+        gen = custom_generator_fit(generator, self.epochs, with_RE=True)
+        total_loss, recon_loss, kl_loss, re_kl_loss = \
+            self.variational_ae.evaluate(gen, steps=steps, verbose=0)
         return total_loss, recon_loss, kl_loss, re_kl_loss
