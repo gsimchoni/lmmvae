@@ -103,7 +103,7 @@ def custom_generator_predict(generator, epochs, with_RE):
         imgs = data[0]
         if with_RE:
             Z = data[1]
-            yield [imgs, Z], None
+            yield (imgs, Z), None
         else:
             yield imgs, None
 
