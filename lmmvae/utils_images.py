@@ -30,12 +30,12 @@ def get_batchsize_steps(n):
     return batch_size, steps
 
 def get_generators(images_df, images_dir, train_samp_subj, valid_samp_subj, test_samp_subj,
-                   batch_size, img_file_col, RE_col, img_height, img_width):
+                   batch_size, img_file_col, RE_col, filter_col, img_height, img_width):
     train_datagen = ImageDataGenerator(rescale = 1./255)
     valid_datagen = ImageDataGenerator(rescale = 1./255)
     test_datagen = ImageDataGenerator(rescale = 1./255)
     train_generator = train_datagen.flow_from_dataframe(
-        images_df[images_df[RE_col].isin(train_samp_subj)],
+        images_df[images_df[filter_col].isin(train_samp_subj)],
         directory = images_dir,
         x_col = img_file_col,
         y_col = RE_col,
@@ -46,7 +46,7 @@ def get_generators(images_df, images_dir, train_samp_subj, valid_samp_subj, test
         validate_filenames = False
     )
     valid_generator = valid_datagen.flow_from_dataframe(
-        images_df[images_df[RE_col].isin(valid_samp_subj)],
+        images_df[images_df[filter_col].isin(valid_samp_subj)],
         directory = images_dir,
         x_col = img_file_col,
         y_col = RE_col,
@@ -57,7 +57,7 @@ def get_generators(images_df, images_dir, train_samp_subj, valid_samp_subj, test
         validate_filenames = False
     )
     test_generator = test_datagen.flow_from_dataframe(
-        images_df[images_df[RE_col].isin(test_samp_subj)],
+        images_df[images_df[filter_col].isin(test_samp_subj)],
         directory = images_dir,
         x_col = img_file_col,
         y_col = RE_col,

@@ -16,7 +16,7 @@ from tensorflow.keras.models import Model
 
 from lmmvae.vae import Sampling, add_layers_functional
 from lmmvae.utils import get_dummies
-from lmmvae.utils_images import custom_generator_fit, custom_generator_predict, divide, get_full_RE_cols_from_generator
+from lmmvae.utils_images import custom_generator_fit, custom_generator_predict, divide
 
 def add_layers_functional_conv2d(X_input, n_neurons, dropout, activation, input_dim):
     if n_neurons is not None and len(n_neurons) > 0:
@@ -582,7 +582,7 @@ class LMMVAEIMG:
         else:
             return X_transformed, None, None
     
-    def _transform_gen(self, generator, U, B_list, extract_B):
+    def _transform_gen(self, generator, U, B_list, extract_B, train_RE_inputs):
         steps = divide(generator.n, generator.batch_size)
         generator.reset()
         prev_shuffle_state = generator.shuffle
@@ -592,7 +592,7 @@ class LMMVAEIMG:
         X_transformed = encoder_output[0]
         B_hat_list = encoder_output[1:]
         if extract_B:
-            Z_inputs = get_full_RE_cols_from_generator(generator)
+            Z_inputs = train_RE_inputs
             B_hat_list_processed = self.extract_Bs_to_compare(Z_inputs, B_hat_list)
             sig2bs_hat_list = [B_hat_list_processed[i].var(axis=0) for i in range(len(B_hat_list_processed))]
             generator.shuffle = prev_shuffle_state
@@ -620,17 +620,17 @@ class LMMVAEIMG:
         check_is_fitted(self, 'history')
         return self._transform(X, Z, U, B_list, extract_B)
 
-    def transform_gen(self, generator, U, B_list, extract_B=False):
+    def transform_gen(self, generator, U, B_list, extract_B=False, train_RE_inputs=None):
         check_is_fitted(self, 'history')
-        return self._transform_gen(generator, U, B_list, extract_B)
+        return self._transform_gen(generator, U, B_list, extract_B, train_RE_inputs)
     
     def fit_transform(self, X, Z, U, B_list, reconstruct_B=True):
         self._fit(X, Z)
         return self._transform(X, Z, U, B_list, reconstruct_B)
     
-    def fit_transform_gen(self, train_generator, valid_generator, U, B_list, reconstruct_B=True):
+    def fit_transform_gen(self, train_generator, valid_generator, U, B_list, reconstruct_B=True, train_RE_inputs=None):
         self._fit_gen(train_generator, valid_generator)
-        return self._transform_gen(train_generator, U, B_list, reconstruct_B)
+        return self._transform_gen(train_generator, U, B_list, reconstruct_B, train_RE_inputs)
 
     def reconstruct(self, X_transformed, Z_idxs, B_list):
         X_reconstructed = self.variational_decoder_no_re.predict([X_transformed], verbose=0)
@@ -868,7 +868,7 @@ class LMMVAEIMGCNN:
         else:
             return X_transformed, None, None
     
-    def _transform_gen(self, generator, U, B_list, extract_B):
+    def _transform_gen(self, generator, U, B_list, extract_B, train_RE_inputs):
         steps = divide(generator.n, generator.batch_size)
         generator.reset()
         prev_shuffle_state = generator.shuffle
@@ -878,7 +878,7 @@ class LMMVAEIMGCNN:
         X_transformed = encoder_output[0]
         B_hat_list = encoder_output[1:]
         if extract_B:
-            Z_inputs = get_full_RE_cols_from_generator(generator)
+            Z_inputs = train_RE_inputs
             B_hat_list_processed = self.extract_Bs_to_compare(Z_inputs, B_hat_list)
             sig2bs_hat_list = [B_hat_list_processed[i].var(axis=0) for i in range(len(B_hat_list_processed))]
             generator.shuffle = prev_shuffle_state
@@ -906,17 +906,17 @@ class LMMVAEIMGCNN:
         check_is_fitted(self, 'history')
         return self._transform(X, Z, U, B_list, extract_B)
 
-    def transform_gen(self, generator, U, B_list, extract_B=False):
+    def transform_gen(self, generator, U, B_list, extract_B=False, train_RE_inputs=None):
         check_is_fitted(self, 'history')
-        return self._transform_gen(generator, U, B_list, extract_B)
+        return self._transform_gen(generator, U, B_list, extract_B, train_RE_inputs)
     
     def fit_transform(self, X, Z, U, B_list, reconstruct_B=True):
         self._fit(X, Z)
         return self._transform(X, Z, U, B_list, reconstruct_B)
 
-    def fit_transform_gen(self, train_generator, valid_generator, U, B_list, reconstruct_B=True):
+    def fit_transform_gen(self, train_generator, valid_generator, U, B_list, reconstruct_B=True, train_RE_inputs=None):
         self._fit_gen(train_generator, valid_generator)
-        return self._transform_gen(train_generator, U, B_list, reconstruct_B)
+        return self._transform_gen(train_generator, U, B_list, reconstruct_B, train_RE_inputs)
 
     def reconstruct(self, X_transformed, Z_idxs, B_list):
         X_reconstructed = self.variational_decoder_no_re.predict([X_transformed], verbose=0)

@@ -103,7 +103,7 @@ def run_lmmvae_images(X_train, X_test, Z_train, Z_test, img_height, img_width, c
                 d, n_sig2bs, n_sig2bs_spatial, re_prior, batch_size, epochs, patience, n_neurons,
                 n_neurons_re, dropout, activation, mode, beta, kernel_root, pred_unknown_clusters,
                 max_spatial_locs, verbose, U, B_list, cnn=False,
-                is_generator=False, train_generator=None, valid_generator=None, test_generator=None):
+                is_generator=False, train_generator=None, valid_generator=None, test_generator=None, train_RE_inputs=None):
     
     if cnn:
         lmmvae = LMMVAEIMGCNN(mode, img_height, img_width, channels, qs, q_spatial,
@@ -115,7 +115,8 @@ def run_lmmvae_images(X_train, X_test, Z_train, Z_test, img_height, img_width, c
                         dropout, activation, beta, kernel_root, pred_unknown_clusters, verbose)
     
     if is_generator:
-        X_transformed_tr, B_hat_list, sig2bs_hat_list = lmmvae.fit_transform_gen(train_generator, valid_generator, U, B_list)
+        X_transformed_tr, B_hat_list, sig2bs_hat_list = lmmvae.fit_transform_gen(train_generator, valid_generator,
+                                                                                 U, B_list, train_RE_inputs=train_RE_inputs)
         X_transformed_te, _, _ = lmmvae.transform_gen(test_generator, U, B_list)
         mse_te = lmmvae.recon_error_on_batches(test_generator, X_transformed_te, B_hat_list)
         X_reconstructed_te = mse_te # TODO: terrible code
@@ -148,7 +149,7 @@ def run_dim_reduction_images(X_train, X_test, Z_train, Z_test, img_height, img_w
             est_cors, batch_size, patience, n_neurons, n_neurons_re, dropout,
             activation, mode, beta, re_prior, kernel, pred_unknown_clusters,
             max_spatial_locs, time2measure_dict, verbose, U, B_list,
-            train_generator=None, valid_generator=None, test_generator=None):
+            train_generator=None, valid_generator=None, test_generator=None, train_RE_inputs=None):
     gc.collect()
     start = time.time()
     losses = [None for _ in range(8)]
@@ -220,7 +221,8 @@ def run_dim_reduction_images(X_train, X_test, Z_train, Z_test, img_height, img_w
             X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, pred_unknown_clusters,
             max_spatial_locs, verbose, U, B_list,
-            is_generator=True, train_generator=train_generator, valid_generator=valid_generator, test_generator=test_generator)
+            is_generator=True, train_generator=train_generator, valid_generator=valid_generator,
+            test_generator=test_generator, train_RE_inputs = train_RE_inputs)
     elif dr_type == 'lmmvae-cnn':
         X_reconstructed_te, sigmas, n_epochs, losses = run_lmmvae_images(
             X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, re_prior, batch_size,
@@ -231,7 +233,8 @@ def run_dim_reduction_images(X_train, X_test, Z_train, Z_test, img_height, img_w
             X_train, X_test, Z_train, Z_test, img_height, img_width, channels, qs, q_spatial, d, n_sig2bs, n_sig2bs_spatial, re_prior, batch_size,
             epochs, patience, n_neurons, n_neurons_re, dropout, activation, mode, beta, kernel, pred_unknown_clusters,
             max_spatial_locs, verbose, U, B_list, cnn=True,
-            is_generator=True, train_generator=train_generator, valid_generator=valid_generator, test_generator=test_generator)
+            is_generator=True, train_generator=train_generator, valid_generator=valid_generator,
+            test_generator=test_generator, train_RE_inputs = train_RE_inputs)
     else:
         raise ValueError(f'{dr_type} is an unknown dr_type')
     end = time.time()
