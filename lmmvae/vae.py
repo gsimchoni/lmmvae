@@ -325,6 +325,7 @@ class LMMVAE:
         # codings_mean = Dense(d, kernel_regularizer=Orthogonal(d))(z1)
         codings_mean = Dense(d)(z1)
         codings_log_var = Dense(d)(z1)
+        # to have a single encoder with double output delete this row (z2) and replace z2 with z1 below
         z2 = add_layers_functional(X_input, n_neurons_re, dropout, activation, p)
         re_codings_mean_list = []
         re_codings_log_var_list = []
