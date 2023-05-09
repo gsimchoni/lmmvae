@@ -1,6 +1,6 @@
 # LMMVAE - Integrating Random Effects in VAE
 
-This is the code repository for our ICML 23 submission "Integrating Random Effects in Variational Autoencoders for Dimensionality Reduction of Correlated Data".
+This is the code repository for our NeurIPS 23 submission "Integrating Random Effects in Variational Autoencoders for Dimensionality Reduction of Correlated Data".
 
 Simulations may be run with the `simulate.py` script using different configuration files like so:
 
