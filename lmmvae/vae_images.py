@@ -582,7 +582,7 @@ class LMMVAEIMG:
         else:
             return X_transformed, None, None
     
-    def _transform_gen(self, generator, U, B_list, extract_B, train_RE_inputs):
+    def _transform_gen_no_batches(self, generator, U, B_list, extract_B, train_RE_inputs):
         steps = divide(generator.n, generator.batch_size)
         generator.reset()
         prev_shuffle_state = generator.shuffle
@@ -598,6 +598,22 @@ class LMMVAEIMG:
             generator.shuffle = prev_shuffle_state
             return X_transformed, B_hat_list_processed, sig2bs_hat_list
         else:
+            generator.shuffle = prev_shuffle_state
+            return X_transformed, None, None
+    
+    def _transform_gen(self, generator, U, B_list, extract_B, train_RE_inputs):
+        if extract_B:
+            B_hat_list_processed = self.encode_on_batches(generator, train_RE_inputs)
+            sig2bs_hat_list = [B_hat_list_processed[i].var(axis=0) for i in range(len(B_hat_list_processed))]
+            # do not care about X_transformed_tr for data that big, for the time being
+            return None, B_hat_list_processed, sig2bs_hat_list
+        else:
+            steps = divide(generator.n, generator.batch_size)
+            generator.reset()
+            prev_shuffle_state = generator.shuffle
+            generator.shuffle = False
+            gen = custom_generator_predict(generator, self.epochs, with_RE=False)
+            X_transformed = self.variational_encoder.predict(gen, steps=steps, verbose=0)[0]
             generator.shuffle = prev_shuffle_state
             return X_transformed, None, None
     
@@ -630,7 +646,9 @@ class LMMVAEIMG:
     
     def fit_transform_gen(self, train_generator, valid_generator, U, B_list, reconstruct_B=True, train_RE_inputs=None):
         self._fit_gen(train_generator, valid_generator)
-        return self._transform_gen(train_generator, U, B_list, reconstruct_B, train_RE_inputs)
+        res_no_batches = self._transform_gen_no_batches(train_generator, U, B_list, reconstruct_B, train_RE_inputs)
+        res = self._transform_gen(train_generator, U, B_list, reconstruct_B, train_RE_inputs)
+        return res
 
     def reconstruct(self, X_transformed, Z_idxs, B_list):
         X_reconstructed = self.variational_decoder_no_re.predict([X_transformed], verbose=0)
@@ -663,6 +681,40 @@ class LMMVAEIMG:
             total_recon_err += np.sum((batch - batch_reconstructed)**2)
         avg_recon_err = total_recon_err / (generator.n * np.prod(generator.image_shape))
         return avg_recon_err
+    
+    def encode_on_batches(self, generator, RE_inputs):
+        generator.reset()
+        prev_shuffle_state = generator.shuffle
+        generator.shuffle = False
+        steps = divide(generator.n, generator.batch_size)
+        B_df_list = [np.zeros((self.qs[i], self.input_img_dim), dtype=np.float32) for i in range(self.n_RE_outputs)]
+        for i in range(steps):
+            batch, Z_idxs = generator.next()
+            encoded_output = self.variational_encoder.predict_on_batch(batch)
+            batch_encoded, batch_B_hat = encoded_output[0], encoded_output[1:]
+            if len(Z_idxs.shape) == 1:
+                Z_idxs = Z_idxs[:, np.newaxis]
+            for i in range(self.n_RE_outputs):
+                B_df = pd.DataFrame(batch_B_hat[i])
+                q_ind = 0 if self.mode == 'longitudinal' else i
+                B_df['z'] = Z_idxs[:, q_ind]
+                B_df2 = B_df.groupby('z')[B_df.columns[:self.input_img_dim]].sum()
+                B_df2 = B_df2.reindex(range(self.qs[q_ind]), fill_value=0)
+                if self.mode == 'spatial' or (self.mode == 'spatial_and_categorical' and i == 0):
+                    B_df2 = pd.DataFrame(self.kernel_root.numpy() @ B_df2.values)
+                B_df_list[i] += B_df2.values
+        B_df_list2 = []
+        for i in range(self.n_RE_outputs):
+            B_df = B_df_list[i]
+            freq_z = np.unique(RE_inputs[i], return_counts=True)
+            freq_z = pd.DataFrame(np.asarray(freq_z).T).set_index(0).reindex(range(self.qs[i]), fill_value=0)
+            B_df= B_df / freq_z.values
+            B_df[np.isnan(B_df)] = 0
+            # convert to image dims
+            B_df = B_df.reshape(B_df.shape[0], self.img_height, self.img_width, self.channels)
+            B_df_list2.append(B_df)
+        generator.shuffle = prev_shuffle_state
+        return B_df_list2
     
     def get_history(self):
         check_is_fitted(self, 'history')
@@ -868,7 +920,7 @@ class LMMVAEIMGCNN:
         else:
             return X_transformed, None, None
     
-    def _transform_gen(self, generator, U, B_list, extract_B, train_RE_inputs):
+    def _transform_gen_no_batches(self, generator, U, B_list, extract_B, train_RE_inputs):
         steps = divide(generator.n, generator.batch_size)
         generator.reset()
         prev_shuffle_state = generator.shuffle
@@ -887,6 +939,22 @@ class LMMVAEIMGCNN:
             generator.shuffle = prev_shuffle_state
             return X_transformed, None, None
     
+    def _transform_gen(self, generator, U, B_list, extract_B, train_RE_inputs):
+        if extract_B:
+            B_hat_list_processed = self.encode_on_batches(generator, train_RE_inputs)
+            sig2bs_hat_list = [B_hat_list_processed[i].var(axis=0) for i in range(len(B_hat_list_processed))]
+            # do not care about X_transformed_tr for data that big, for the time being
+            return None, B_hat_list_processed, sig2bs_hat_list
+        else:
+            steps = divide(generator.n, generator.batch_size)
+            generator.reset()
+            prev_shuffle_state = generator.shuffle
+            generator.shuffle = False
+            gen = custom_generator_predict(generator, self.epochs, with_RE=False)
+            X_transformed = self.variational_encoder.predict(gen, steps=steps, verbose=0)[0]
+            generator.shuffle = prev_shuffle_state
+            return X_transformed, None, None
+
     def extract_Bs_to_compare(self, Z_inputs, B_hat_list):
         B_df2_list = []
         for i in range(self.n_RE_outputs):
@@ -949,6 +1017,40 @@ class LMMVAEIMGCNN:
             total_recon_err += np.sum((batch - batch_reconstructed)**2)
         avg_recon_err = total_recon_err / (generator.n * np.prod(generator.image_shape))
         return avg_recon_err
+    
+    def encode_on_batches(self, generator, RE_inputs):
+        generator.reset()
+        prev_shuffle_state = generator.shuffle
+        generator.shuffle = False
+        steps = divide(generator.n, generator.batch_size)
+        B_df_list = [np.zeros((self.qs[i], self.input_img_dim), dtype=np.float32) for i in range(self.n_RE_outputs)]
+        for i in range(steps):
+            batch, Z_idxs = generator.next()
+            encoded_output = self.variational_encoder.predict_on_batch(batch)
+            batch_encoded, batch_B_hat = encoded_output[0], encoded_output[1:]
+            if len(Z_idxs.shape) == 1:
+                Z_idxs = Z_idxs[:, np.newaxis]
+            for i in range(self.n_RE_outputs):
+                B_df = pd.DataFrame(batch_B_hat[i])
+                q_ind = 0 if self.mode == 'longitudinal' else i
+                B_df['z'] = Z_idxs[:, q_ind]
+                B_df2 = B_df.groupby('z')[B_df.columns[:self.input_img_dim]].sum()
+                B_df2 = B_df2.reindex(range(self.qs[q_ind]), fill_value=0)
+                if self.mode == 'spatial' or (self.mode == 'spatial_and_categorical' and i == 0):
+                    B_df2 = pd.DataFrame(self.kernel_root.numpy() @ B_df2.values)
+                B_df_list[i] += B_df2.values
+        B_df_list2 = []
+        for i in range(self.n_RE_outputs):
+            B_df = B_df_list[i]
+            freq_z = np.unique(RE_inputs[i], return_counts=True)
+            freq_z = pd.DataFrame(np.asarray(freq_z).T).set_index(0).reindex(range(self.qs[i]), fill_value=0)
+            B_df= B_df / freq_z.values
+            B_df[np.isnan(B_df)] = 0
+            # convert to image dims
+            B_df = B_df.reshape(B_df.shape[0], self.img_height, self.img_width, self.channels)
+            B_df_list2.append(B_df)
+        generator.shuffle = prev_shuffle_state
+        return B_df_list2
     
     def get_history(self):
         check_is_fitted(self, 'history')
