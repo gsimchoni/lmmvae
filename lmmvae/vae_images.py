@@ -16,7 +16,7 @@ from tensorflow.keras.models import Model
 
 from lmmvae.vae import Sampling, add_layers_functional
 from lmmvae.utils import get_dummies
-from lmmvae.utils_images import custom_generator_fit, custom_generator_predict, divide
+from lmmvae.utils_images import custom_generator_fit, custom_generator_predict, divide, save_recon_batches_arrays
 
 def add_layers_functional_conv2d(X_input, n_neurons, dropout, activation, input_dim):
     if n_neurons is not None and len(n_neurons) > 0:
@@ -66,7 +66,7 @@ class VAEIMG:
 
     def __init__(self, img_height, img_width, channels, d, batch_size, epochs, patience, n_neurons,
                  dropout, activation, beta, pred_unknown_clusters, embed_RE,
-                 qs, verbose) -> None:
+                 qs, save_recon_batches_uid, verbose) -> None:
         super().__init__()
         self.batch_size = batch_size
         self.epochs = epochs
@@ -77,6 +77,8 @@ class VAEIMG:
         self.qs = qs
         self.Z_embed_dim = 10
         self.history = None
+        self.save_recon_batches_uid = save_recon_batches_uid
+        self.batches_to_keep = list(range(5))
         self.callbacks = [EarlyStopping(monitor='val_loss',
                                         patience=self.epochs if patience is None else patience)]
         X_input = Input(shape=(img_height, img_width, channels))
@@ -208,6 +210,8 @@ class VAEIMG:
             idx = np.arange(i * generator.batch_size, i * generator.batch_size + batch.shape[0])
             batch_reconstructed = self.variational_decoder.predict_on_batch([X_transformed[idx]])
             total_recon_err += np.sum((batch - batch_reconstructed)**2)
+            if i in self.batches_to_keep and self.save_recon_batches_uid is not None:
+                save_recon_batches_arrays(batch, batch_reconstructed, i, 'vae_embed' + str(self.embed_RE), self.save_recon_batches_uid)
         avg_recon_err = total_recon_err / (generator.n * np.prod(generator.image_shape))
         return avg_recon_err
 
@@ -234,7 +238,7 @@ class VAEIMGCNN:
 
     def __init__(self, img_height, img_width, channels, d, batch_size, epochs, patience, n_neurons,
                  dropout, activation, beta, pred_unknown_clusters, embed_RE,
-                 qs, verbose) -> None:
+                 qs, save_recon_batches_uid, verbose) -> None:
         super().__init__()
         self.batch_size = batch_size
         self.epochs = epochs
@@ -245,6 +249,8 @@ class VAEIMGCNN:
         self.qs = qs
         self.Z_embed_dim = 10
         self.history = None
+        self.save_recon_batches_uid = save_recon_batches_uid
+        self.batches_to_keep = list(range(5))
         self.callbacks = [EarlyStopping(monitor='val_loss',
                                         patience=self.epochs if patience is None else patience)]
         input_img_dim = img_height * img_width * channels
@@ -375,6 +381,8 @@ class VAEIMGCNN:
             idx = np.arange(i * generator.batch_size, i * generator.batch_size + batch.shape[0])
             batch_reconstructed = self.variational_decoder.predict_on_batch([X_transformed[idx]])
             total_recon_err += np.sum((batch - batch_reconstructed)**2)
+            if i in self.batches_to_keep and self.save_recon_batches_uid is not None:
+                save_recon_batches_arrays(batch, batch_reconstructed, i, 'vae_cnn_embed' + str(self.embed_RE), self.save_recon_batches_uid)
         avg_recon_err = total_recon_err / (generator.n * np.prod(generator.image_shape))
         return avg_recon_err
     
@@ -401,7 +409,7 @@ class LMMVAEIMG:
 
     def __init__(self, mode, img_height, img_width, channels, qs, q_spatial, d, n_sig2bs,
                 re_prior, batch_size, epochs, patience, n_neurons, n_neurons_re,
-                dropout, activation, beta, kernel_root, pred_unknown_clusters, verbose) -> None:
+                dropout, activation, beta, kernel_root, pred_unknown_clusters, save_recon_batches_uid, verbose) -> None:
         super().__init__()
         K.clear_session()
         self.batch_size = batch_size
@@ -418,6 +426,8 @@ class LMMVAEIMG:
         self.pred_unknown_clusters = pred_unknown_clusters
         self.n_sig2bs = n_sig2bs
         self.qs = qs
+        self.save_recon_batches_uid = save_recon_batches_uid
+        self.batches_to_keep = list(range(5))
         if self.mode in ['spatial_fit_categorical', 'spatial_and_categorical']:
             self.qs = [q_spatial] + list(qs)
         if self.mode == 'spatial':
@@ -675,10 +685,12 @@ class LMMVAEIMG:
             batch_reconstructed = self.variational_decoder_no_re.predict_on_batch([X_transformed[idx]])
             if len(Z_idxs.shape) == 1:
                 Z_idxs = Z_idxs[:, np.newaxis]
-            for i in range(Z_idxs.shape[1]):
-                Z = get_dummies(Z_idxs[:, i], self.qs[i])
-                batch_reconstructed += np.tensordot(Z.toarray(),  B_list[i], axes=[1,0])
+            for j in range(Z_idxs.shape[1]):
+                Z = get_dummies(Z_idxs[:, j], self.qs[j])
+                batch_reconstructed += np.tensordot(Z.toarray(),  B_list[j], axes=[1,0])
             total_recon_err += np.sum((batch - batch_reconstructed)**2)
+            if i in self.batches_to_keep and self.save_recon_batches_uid is not None:
+                save_recon_batches_arrays(batch, batch_reconstructed, i, 'lmmvae', self.save_recon_batches_uid)
         avg_recon_err = total_recon_err / (generator.n * np.prod(generator.image_shape))
         return avg_recon_err
     
@@ -708,7 +720,8 @@ class LMMVAEIMG:
             B_df = B_df_list[i]
             freq_z = np.unique(RE_inputs[i], return_counts=True)
             freq_z = pd.DataFrame(np.asarray(freq_z).T).set_index(0).reindex(range(self.qs[i]), fill_value=0)
-            B_df= B_df / freq_z.values
+            with np.errstate(divide='ignore', invalid='ignore'):
+                B_df= B_df / freq_z.values
             B_df[np.isnan(B_df)] = 0
             # convert to image dims
             B_df = B_df.reshape(B_df.shape[0], self.img_height, self.img_width, self.channels)
@@ -741,7 +754,8 @@ class LMMVAEIMGCNN:
 
     def __init__(self, mode, img_height, img_width, channels, qs, q_spatial, d, n_sig2bs,
                 re_prior, batch_size, epochs, patience, n_neurons, n_neurons_re,
-                dropout, activation, beta, kernel_root, pred_unknown_clusters, verbose) -> None:
+                dropout, activation, beta, kernel_root, pred_unknown_clusters,
+                save_recon_batches_uid, verbose) -> None:
         super().__init__()
         K.clear_session()
         self.batch_size = batch_size
@@ -759,6 +773,8 @@ class LMMVAEIMGCNN:
         self.pred_unknown_clusters = pred_unknown_clusters
         self.n_sig2bs = n_sig2bs
         self.qs = qs
+        self.save_recon_batches_uid = save_recon_batches_uid
+        self.batches_to_keep = list(range(5))
         if self.mode in ['spatial_fit_categorical', 'spatial_and_categorical']:
             self.qs = [q_spatial] + list(qs)
         if self.mode == 'spatial':
@@ -1011,10 +1027,12 @@ class LMMVAEIMGCNN:
             batch_reconstructed = self.variational_decoder_no_re.predict_on_batch([X_transformed[idx]])
             if len(Z_idxs.shape) == 1:
                 Z_idxs = Z_idxs[:, np.newaxis]
-            for i in range(Z_idxs.shape[1]):
-                Z = get_dummies(Z_idxs[:, i], self.qs[i])
-                batch_reconstructed += np.tensordot(Z.toarray(),  B_list[i], axes=[1,0])
+            for j in range(Z_idxs.shape[1]):
+                Z = get_dummies(Z_idxs[:, j], self.qs[j])
+                batch_reconstructed += np.tensordot(Z.toarray(),  B_list[j], axes=[1,0])
             total_recon_err += np.sum((batch - batch_reconstructed)**2)
+            if i in self.batches_to_keep and self.save_recon_batches_uid is not None:
+                save_recon_batches_arrays(batch, batch_reconstructed, i, 'lmmvae_cnn', self.save_recon_batches_uid)
         avg_recon_err = total_recon_err / (generator.n * np.prod(generator.image_shape))
         return avg_recon_err
     
@@ -1044,7 +1062,8 @@ class LMMVAEIMGCNN:
             B_df = B_df_list[i]
             freq_z = np.unique(RE_inputs[i], return_counts=True)
             freq_z = pd.DataFrame(np.asarray(freq_z).T).set_index(0).reindex(range(self.qs[i]), fill_value=0)
-            B_df= B_df / freq_z.values
+            with np.errstate(divide='ignore', invalid='ignore'):
+                B_df= B_df / freq_z.values
             B_df[np.isnan(B_df)] = 0
             # convert to image dims
             B_df = B_df.reshape(B_df.shape[0], self.img_height, self.img_width, self.channels)

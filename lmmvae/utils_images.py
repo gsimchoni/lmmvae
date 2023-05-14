@@ -120,3 +120,7 @@ def get_full_RE_cols_from_generator(generator):
     generator.shuffle = prev_shuffle_state
     return Z
 
+def save_recon_batches_arrays(batch, batch_reconstructed, i, dr_type, uuid):
+    filename = dr_type + '_' + uuid + '_batch' + str(i) + '.npy'
+    with open(filename, 'wb') as f:
+        np.save(f, [batch, batch_reconstructed])
