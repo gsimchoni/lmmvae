@@ -382,6 +382,8 @@ class LMMVAE:
             axis=-1)
         kl_loss = K.mean(kl_loss)
         for i in range(self.n_RE_outputs):
+            q_ind = 0 if self.mode == 'longitudinal' else i
+            Z0 = Z_mats[q_ind]
             re_codings_mean = re_codings_mean_list[i]
             re_codings_log_var = re_codings_log_var_list[i]
             re_codings_mean = tf.math.divide_no_nan(K.dot(K.transpose(Z0), re_codings_mean), K.reshape(K.sum(Z0, axis=0), (self.qs[q_ind], 1)))            
