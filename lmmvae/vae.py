@@ -384,11 +384,14 @@ class LMMVAE:
         for i in range(self.n_RE_outputs):
             re_codings_mean = re_codings_mean_list[i]
             re_codings_log_var = re_codings_log_var_list[i]
+            re_codings_mean = tf.math.divide_no_nan(K.dot(K.transpose(Z0), re_codings_mean), K.reshape(K.sum(Z0, axis=0), (self.qs[q_ind], 1)))            
+            re_codings_log_var = tf.math.divide_no_nan(K.dot(K.transpose(Z0), K.exp(re_codings_log_var)), K.reshape(K.sum(Z0, axis=0)**2, (self.qs[q_ind], 1)))
+            re_codings_log_var = K.log(tf.where(tf.equal(re_codings_log_var, 0), tf.ones_like(re_codings_log_var), re_codings_log_var))
             re_kl_loss_i = -0.5 * K.sum(
                 1 + re_codings_log_var - self.re_prior -
                 K.exp(re_codings_log_var - self.re_prior) - K.square(re_codings_mean) * K.exp(-self.re_prior),
                 axis=-1)
-            re_kl_loss_i = K.mean(re_kl_loss_i)
+            re_kl_loss_i = K.sum(re_kl_loss_i) / self.batch_size
             if i == 0:
                 re_kl_loss = re_kl_loss_i
             else:
